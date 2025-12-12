@@ -1,5 +1,5 @@
 import type { IDataObject, IExecuteFunctions, IExecuteSingleFunctions, IHookFunctions, ILoadOptionsFunctions } from 'n8n-workflow';
-export declare const mapOperationToJSONRPC: {
+export declare const mapOperationToXMLRPC: {
     create: string;
     get: string;
     getAll: string;
@@ -7,7 +7,7 @@ export declare const mapOperationToJSONRPC: {
     delete: string;
 };
 export declare const mapOdooResources: Record<string, string>;
-export declare const mapFilterOperationToJSONRPC: {
+export declare const mapFilterOperationToXMLRPC: {
     equal: string;
     notEqual: string;
     greaterThen: string;
@@ -41,7 +41,8 @@ export interface IOdooResponceFields {
 type OdooCRUD = 'create' | 'update' | 'delete' | 'get' | 'getAll';
 export declare function odooGetDBName(databaseName: string | undefined, url: string): string;
 export declare function processNameValueFields(value?: IDataObject): IDataObject;
-export declare function odooJSONRPCRequest(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, body: IDataObject, url: string, extraHeaders?: IDataObject): Promise<any>;
+export declare function odooGetUserID(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, username: string, password: string, url: string, extraHeaders?: IDataObject): Promise<number>;
+export declare function odooGetServerVersion(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, url: string, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
 export declare function odooGetModelFields(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string, extraHeaders?: IDataObject): Promise<IDataObject>;
 export declare function odooCreate(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, newItem: IDataObject, extraHeaders?: IDataObject): Promise<{
     id: IDataObject | IDataObject[];
@@ -55,7 +56,5 @@ export declare function odooUpdate(this: IHookFunctions | IExecuteFunctions | IE
 export declare function odooDelete(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, extraHeaders?: IDataObject): Promise<{
     success: boolean;
 }>;
-export declare function odooGetUserID(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, username: string, password: string, url: string, extraHeaders?: IDataObject): Promise<number>;
-export declare function odooGetServerVersion(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, url: string, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
 export {};
 //# sourceMappingURL=GenericFunctions.d.ts.map

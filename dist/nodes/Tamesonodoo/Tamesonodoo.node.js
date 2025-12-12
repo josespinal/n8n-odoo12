@@ -108,25 +108,7 @@ class Tamesonodoo {
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
                     const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const body = {
-                        jsonrpc: '2.0',
-                        method: 'call',
-                        params: {
-                            service: 'object',
-                            method: 'execute',
-                            args: [
-                                db,
-                                userID,
-                                password,
-                                'ir.model',
-                                'search_read',
-                                [],
-                                ['name', 'model', 'modules'],
-                            ],
-                        },
-                        id: Math.floor(Math.random() * 100),
-                    };
-                    const responce = (await GenericFunctions_1.odooJSONRPCRequest.call(this, body, url, customHeaders));
+                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'ir.model', 'getAll', url, undefined, ['name', 'model', 'modules'], 0, 0, customHeaders));
                     const options = responce.map((model) => {
                         return {
                             name: model.name,
@@ -144,17 +126,7 @@ class Tamesonodoo {
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
                     const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const body = {
-                        jsonrpc: '2.0',
-                        method: 'call',
-                        params: {
-                            service: 'object',
-                            method: 'execute',
-                            args: [db, userID, password, 'res.country.state', 'search_read', [], ['id', 'name']],
-                        },
-                        id: Math.floor(Math.random() * 100),
-                    };
-                    const responce = (await GenericFunctions_1.odooJSONRPCRequest.call(this, body, url, customHeaders));
+                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'res.country.state', 'getAll', url, undefined, ['id', 'name'], 0, 0, customHeaders));
                     const options = responce.map((state) => {
                         return {
                             name: state.name,
@@ -171,17 +143,7 @@ class Tamesonodoo {
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
                     const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const body = {
-                        jsonrpc: '2.0',
-                        method: 'call',
-                        params: {
-                            service: 'object',
-                            method: 'execute',
-                            args: [db, userID, password, 'res.country', 'search_read', [], ['id', 'name']],
-                        },
-                        id: Math.floor(Math.random() * 100),
-                    };
-                    const responce = (await GenericFunctions_1.odooJSONRPCRequest.call(this, body, url, customHeaders));
+                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'res.country', 'getAll', url, undefined, ['id', 'name'], 0, 0, customHeaders));
                     const options = responce.map((country) => {
                         return {
                             name: country.name,
@@ -196,35 +158,9 @@ class Tamesonodoo {
                     const credentials = credential.data;
                     const customHeaders = getCustomHeaders(credentials);
                     try {
-                        const body = {
-                            jsonrpc: '2.0',
-                            method: 'call',
-                            params: {
-                                service: 'common',
-                                method: 'login',
-                                args: [
-                                    (0, GenericFunctions_1.odooGetDBName)(credentials?.db, credentials?.url),
-                                    credentials?.username,
-                                    credentials?.password,
-                                ],
-                            },
-                            id: Math.floor(Math.random() * 100),
-                        };
-                        const options = {
-                            headers: {
-                                'User-Agent': 'n8n',
-                                Connection: 'keep-alive',
-                                Accept: '*/*',
-                                'Content-Type': 'application/json',
-                                ...customHeaders,
-                            },
-                            method: 'POST',
-                            body,
-                            uri: `${credentials?.url.replace(/\/$/, '')}/jsonrpc`,
-                            json: true,
-                        };
-                        const result = await this.helpers.request(options);
-                        if (result.error || !result.result) {
+                        const db = (0, GenericFunctions_1.odooGetDBName)(credentials?.db, credentials?.url);
+                        const userId = await GenericFunctions_1.odooGetUserID.call(this, db, credentials?.username, credentials?.password, credentials?.url, customHeaders);
+                        if (!userId) {
                             return {
                                 status: 'Error',
                                 message: 'Credentials are not valid',

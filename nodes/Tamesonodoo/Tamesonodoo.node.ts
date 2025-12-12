@@ -2,6 +2,7 @@ import type {
 	ICredentialsDecrypted,
 	ICredentialTestFunctions,
 	IExecuteFunctions,
+	IHookFunctions,
 	ILoadOptionsFunctions,
 	INodeCredentialTestResult,
 	INodeExecutionData,
@@ -31,7 +32,6 @@ import {
 	odooGetDBName,
 	odooGetModelFields,
 	odooGetUserID,
-	odooJSONRPCRequest,
 	odooUpdate,
 	processNameValueFields,
 } from './GenericFunctions';
@@ -169,29 +169,18 @@ export class Tamesonodoo implements INodeType {
 				const db = odooGetDBName(credentials.db, url);
 				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
-				const body = {
-					jsonrpc: '2.0',
-					method: 'call',
-					params: {
-						service: 'object',
-						method: 'execute',
-						args: [
-							db,
-							userID,
-							password,
-							'ir.model',
-							'search_read',
-							[],
-							['name', 'model', 'modules'],
-						],
-					},
-					id: Math.floor(Math.random() * 100),
-				};
-
-				const responce = (await odooJSONRPCRequest.call(
+				const responce = (await odooGetAll.call(
 					this,
-					body,
+					db,
+					userID,
+					password,
+					'ir.model',
+					'getAll',
 					url,
+					undefined,
+					['name', 'model', 'modules'] as unknown as IDataObject[],
+					0,
+					0,
 					customHeaders,
 				)) as IDataObject[];
 				const options = responce.map((model) => {
@@ -213,21 +202,18 @@ export class Tamesonodoo implements INodeType {
 				const db = odooGetDBName(credentials.db, url);
 				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
-				const body = {
-					jsonrpc: '2.0',
-					method: 'call',
-					params: {
-						service: 'object',
-						method: 'execute',
-						args: [db, userID, password, 'res.country.state', 'search_read', [], ['id', 'name']],
-					},
-					id: Math.floor(Math.random() * 100),
-				};
-
-				const responce = (await odooJSONRPCRequest.call(
+				const responce = (await odooGetAll.call(
 					this,
-					body,
+					db,
+					userID,
+					password,
+					'res.country.state',
+					'getAll',
 					url,
+					undefined,
+					['id', 'name'] as unknown as IDataObject[],
+					0,
+					0,
 					customHeaders,
 				)) as IDataObject[];
 				const options = responce.map((state) => {
@@ -250,21 +236,18 @@ export class Tamesonodoo implements INodeType {
 				const db = odooGetDBName(credentials.db, url);
 				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
-				const body = {
-					jsonrpc: '2.0',
-					method: 'call',
-					params: {
-						service: 'object',
-						method: 'execute',
-						args: [db, userID, password, 'res.country', 'search_read', [], ['id', 'name']],
-					},
-					id: Math.floor(Math.random() * 100),
-				};
-
-				const responce = (await odooJSONRPCRequest.call(
+				const responce = (await odooGetAll.call(
 					this,
-					body,
+					db,
+					userID,
+					password,
+					'res.country',
+					'getAll',
 					url,
+					undefined,
+					['id', 'name'] as unknown as IDataObject[],
+					0,
+					0,
 					customHeaders,
 				)) as IDataObject[];
 				const options = responce.map((country) => {
@@ -288,38 +271,17 @@ export class Tamesonodoo implements INodeType {
 				const customHeaders = getCustomHeaders(credentials);
 
 				try {
-					const body = {
-						jsonrpc: '2.0',
-						method: 'call',
-						params: {
-							service: 'common',
-							method: 'login',
-							args: [
-								odooGetDBName(credentials?.db, credentials?.url),
-								credentials?.username,
-								credentials?.password,
-							],
-						},
-						id: Math.floor(Math.random() * 100),
-					};
+					const db = odooGetDBName(credentials?.db, credentials?.url);
+					const userId = await odooGetUserID.call(
+						this as unknown as IHookFunctions,
+						db,
+						credentials?.username,
+						credentials?.password,
+						credentials?.url,
+						customHeaders,
+					);
 
-					const options = {
-						headers: {
-							'User-Agent': 'n8n',
-							Connection: 'keep-alive',
-							Accept: '*/*',
-							'Content-Type': 'application/json',
-							...customHeaders,
-						},
-						method: 'POST',
-						body,
-						uri: `${credentials?.url.replace(/\/$/, '')}/jsonrpc`,
-						json: true,
-					};
-
-					const result = await this.helpers.request(options);
-
-					if (result.error || !result.result) {
+					if (!userId) {
 						return {
 							status: 'Error',
 							message: 'Credentials are not valid',
