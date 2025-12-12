@@ -1,0 +1,6 @@
+- Add redirect handling: detect 301/302 in the XML-RPC response and retry once against the Location header - (useful behind WAF/load balancers).
+- Optional user-specified headers in node params (per call) in addition to credential headers, for cases where different endpoints need different headers.
+- Better error surfacing: include the status code and a short body snippet directly in the node error when - we detect non-XML responses, so users don’t have to check logs.
+- Timeout/retry knobs on the XML-RPC client (configurable in credentials) to cope with slow or flaky Odoo instances.
+- A tiny “health check” operation in the node (e.g., call version and return the result) to quickly - validate connectivity from inside a workflow.
+- Add an option to follow redirects off by default (e.g., followRedirects: true/false in credentials) for environments that require it.
