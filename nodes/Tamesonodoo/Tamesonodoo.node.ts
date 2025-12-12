@@ -324,11 +324,6 @@ export class Tamesonodoo implements INodeType {
 							status: 'Error',
 							message: 'Credentials are not valid',
 						};
-					} else if (result.error) {
-						return {
-							status: 'Error',
-							message: `Credentials are not valid: ${result.error.data.message}`,
-						};
 					}
 				} catch (error) {
 					return {

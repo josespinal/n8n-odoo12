@@ -1,18 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mapFilterOperationToJSONRPC = exports.mapOdooResources = exports.mapOperationToJSONRPC = void 0;
-exports.odooGetDBName = odooGetDBName;
-exports.processNameValueFields = processNameValueFields;
-exports.odooJSONRPCRequest = odooJSONRPCRequest;
-exports.odooGetModelFields = odooGetModelFields;
-exports.odooCreate = odooCreate;
-exports.odooGet = odooGet;
-exports.odooCallMethod = odooCallMethod;
-exports.odooGetAll = odooGetAll;
-exports.odooUpdate = odooUpdate;
-exports.odooDelete = odooDelete;
-exports.odooGetUserID = odooGetUserID;
-exports.odooGetServerVersion = odooGetServerVersion;
+exports.odooGetServerVersion = exports.odooGetUserID = exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooJSONRPCRequest = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToJSONRPC = exports.mapOdooResources = exports.mapOperationToJSONRPC = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 exports.mapOperationToJSONRPC = {
     create: 'create',
@@ -47,6 +35,7 @@ function odooGetDBName(databaseName, url) {
         return '';
     return odooURL.hostname.split('.')[0];
 }
+exports.odooGetDBName = odooGetDBName;
 function processFilters(value) {
     const filters = value?.filter;
     return filters?.map((item) => {
@@ -65,6 +54,7 @@ function processNameValueFields(value) {
         return { ...acc, [record.fieldName]: record.fieldValue };
     }, {});
 }
+exports.processNameValueFields = processNameValueFields;
 async function odooJSONRPCRequest(body, url, extraHeaders) {
     try {
         const baseHeaders = {
@@ -93,6 +83,7 @@ async function odooJSONRPCRequest(body, url, extraHeaders) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooJSONRPCRequest = odooJSONRPCRequest;
 async function odooGetModelFields(db, userID, password, resource, url, extraHeaders) {
     try {
         const body = {
@@ -119,6 +110,7 @@ async function odooGetModelFields(db, userID, password, resource, url, extraHead
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooGetModelFields = odooGetModelFields;
 async function odooCreate(db, userID, password, resource, operation, url, newItem, extraHeaders) {
     try {
         const body = {
@@ -145,6 +137,7 @@ async function odooCreate(db, userID, password, resource, operation, url, newIte
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooCreate = odooCreate;
 async function odooGet(db, userID, password, resource, operation, url, itemsID, fieldsToReturn, extraHeaders) {
     try {
         if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
@@ -177,6 +170,7 @@ async function odooGet(db, userID, password, resource, operation, url, itemsID, 
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooGet = odooGet;
 async function odooCallMethod(db, userID, password, resource, url, callMethod, itemsIDs, extraHeaders) {
     try {
         const body = {
@@ -202,6 +196,7 @@ async function odooCallMethod(db, userID, password, resource, url, callMethod, i
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooCallMethod = odooCallMethod;
 async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0, extraHeaders) {
     try {
         const body = {
@@ -230,6 +225,7 @@ async function odooGetAll(db, userID, password, resource, operation, url, filter
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooGetAll = odooGetAll;
 async function odooUpdate(db, userID, password, resource, operation, url, itemsID, fieldsToUpdate, extraHeaders) {
     try {
         if (!Object.keys(fieldsToUpdate).length) {
@@ -269,6 +265,7 @@ async function odooUpdate(db, userID, password, resource, operation, url, itemsI
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooUpdate = odooUpdate;
 async function odooDelete(db, userID, password, resource, operation, url, itemsID, extraHeaders) {
     if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), {
@@ -301,6 +298,7 @@ async function odooDelete(db, userID, password, resource, operation, url, itemsI
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooDelete = odooDelete;
 async function odooGetUserID(db, username, password, url, extraHeaders) {
     try {
         const body = {
@@ -320,6 +318,7 @@ async function odooGetUserID(db, username, password, url, extraHeaders) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooGetUserID = odooGetUserID;
 async function odooGetServerVersion(url, extraHeaders) {
     try {
         const body = {
@@ -338,4 +337,5 @@ async function odooGetServerVersion(url, extraHeaders) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
+exports.odooGetServerVersion = odooGetServerVersion;
 //# sourceMappingURL=GenericFunctions.js.map
