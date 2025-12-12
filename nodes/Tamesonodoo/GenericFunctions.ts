@@ -117,6 +117,18 @@ async function xmlRpcCall(client: Client, method: string, params: unknown[]): Pr
 	});
 }
 
+export async function odooAuthenticate(
+	db: string,
+	username: string,
+	password: string,
+	url: string,
+	extraHeaders?: IDataObject,
+): Promise<number> {
+	const client = createXmlRpcClient('common', url, extraHeaders);
+	const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);
+	return Number(uid);
+}
+
 export async function odooGetUserID(
 	this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions,
 	db: string,

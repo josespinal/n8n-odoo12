@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
+exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
 const xmlrpc_1 = require("xmlrpc");
 const n8n_workflow_1 = require("n8n-workflow");
 exports.mapOperationToXMLRPC = {
@@ -83,6 +83,12 @@ async function xmlRpcCall(client, method, params) {
         });
     });
 }
+async function odooAuthenticate(db, username, password, url, extraHeaders) {
+    const client = createXmlRpcClient('common', url, extraHeaders);
+    const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);
+    return Number(uid);
+}
+exports.odooAuthenticate = odooAuthenticate;
 async function odooGetUserID(db, username, password, url, extraHeaders) {
     try {
         const client = createXmlRpcClient('common', url, extraHeaders);

@@ -29,6 +29,7 @@ import {
 	odooDelete,
 	odooGet,
 	odooGetAll,
+	odooAuthenticate,
 	odooGetDBName,
 	odooGetModelFields,
 	odooGetUserID,
@@ -272,8 +273,7 @@ export class Tamesonodoo implements INodeType {
 
 				try {
 					const db = odooGetDBName(credentials?.db, credentials?.url);
-					const userId = await odooGetUserID.call(
-						this as unknown as IHookFunctions,
+					const userId = await odooAuthenticate(
 						db,
 						credentials?.username,
 						credentials?.password,

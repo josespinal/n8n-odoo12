@@ -159,7 +159,7 @@ class Tamesonodoo {
                     const customHeaders = getCustomHeaders(credentials);
                     try {
                         const db = (0, GenericFunctions_1.odooGetDBName)(credentials?.db, credentials?.url);
-                        const userId = await GenericFunctions_1.odooGetUserID.call(this, db, credentials?.username, credentials?.password, credentials?.url, customHeaders);
+                        const userId = await (0, GenericFunctions_1.odooAuthenticate)(db, credentials?.username, credentials?.password, credentials?.url, customHeaders);
                         if (!userId) {
                             return {
                                 status: 'Error',
