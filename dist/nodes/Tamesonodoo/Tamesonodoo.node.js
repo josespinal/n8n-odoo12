@@ -168,9 +168,14 @@ class Tamesonodoo {
                         }
                     }
                     catch (error) {
+                        // Emit detailed information to n8n logs to aid troubleshooting
+                        console.error('Odoo credential test failed', {
+                            message: error.message,
+                            stack: error.stack,
+                        });
                         return {
                             status: 'Error',
-                            message: `Settings are not valid: ${error}`,
+                            message: `Settings are not valid: ${error.message || error}`,
                         };
                     }
                     return {

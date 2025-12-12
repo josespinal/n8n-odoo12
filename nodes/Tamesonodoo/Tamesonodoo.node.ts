@@ -288,9 +288,15 @@ export class Tamesonodoo implements INodeType {
 						};
 					}
 				} catch (error) {
+					// Emit detailed information to n8n logs to aid troubleshooting
+					console.error('Odoo credential test failed', {
+						message: (error as Error).message,
+						stack: (error as Error).stack,
+					});
+
 					return {
 						status: 'Error',
-						message: `Settings are not valid: ${error}`,
+						message: `Settings are not valid: ${(error as Error).message || error}`,
 					};
 				}
 
