@@ -188,7 +188,20 @@ async function executeKw(db, userID, password, model, method, args, kwargs = {},
         return await xmlRpcCall(client, 'execute_kw', [db, userID, password, model, method, args, kwargs]);
     }
     catch (error) {
-        throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
+        let probe;
+        try {
+            const endpoint = `${(url || '').replace(/\/$/, '')}/xmlrpc/2/object`;
+            probe = await probeXmlRpcEndpoint(endpoint, extraHeaders);
+            // eslint-disable-next-line no-console
+            console.error('Odoo XML-RPC object call probe', { endpoint, probe });
+        }
+        catch (_) {
+            // ignore probe errors
+        }
+        throw new n8n_workflow_1.NodeApiError(this.getNode(), error, {
+            message: error.message,
+            description: probe ? `Probe: ${probe}` : undefined,
+        });
     }
 }
 async function odooGetModelFields(db, userID, password, resource, url, extraHeaders) {

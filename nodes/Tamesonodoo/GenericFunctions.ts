@@ -261,7 +261,20 @@ async function executeKw(
 		const client = createXmlRpcClient('object', url || '', extraHeaders);
 		return await xmlRpcCall(client, 'execute_kw', [db, userID, password, model, method, args, kwargs]);
 	} catch (error) {
-		throw new NodeApiError(this.getNode(), error as JsonObject);
+		let probe: string | undefined;
+		try {
+			const endpoint = `${(url || '').replace(/\/$/, '')}/xmlrpc/2/object`;
+			probe = await probeXmlRpcEndpoint(endpoint, extraHeaders);
+			// eslint-disable-next-line no-console
+			console.error('Odoo XML-RPC object call probe', { endpoint, probe });
+		} catch (_) {
+			// ignore probe errors
+		}
+
+		throw new NodeApiError(this.getNode(), error as JsonObject, {
+			message: (error as Error).message,
+			description: probe ? `Probe: ${probe}` : undefined,
+		});
 	}
 }
 
