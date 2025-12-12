@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
+exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.buildAuthenticateProbeBody = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
 const node_http_1 = require("node:http");
 const node_https_1 = require("node:https");
 const xmlrpc_1 = require("xmlrpc");
@@ -99,6 +99,23 @@ async function xmlRpcCall(client, method, params) {
         });
     });
 }
+function escapeXml(value) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+function buildAuthenticateProbeBody(db, username, password) {
+    return ("<?xml version='1.0'?><methodCall><methodName>authenticate</methodName><params>" +
+        `<param><value><string>${escapeXml(db)}</string></value></param>` +
+        `<param><value><string>${escapeXml(username)}</string></value></param>` +
+        `<param><value><string>${escapeXml(password)}</string></value></param>` +
+        '<param><value><struct></struct></value></param>' +
+        '</params></methodCall>');
+}
+exports.buildAuthenticateProbeBody = buildAuthenticateProbeBody;
 async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0"?><methodCall><methodName>version</methodName><params></params></methodCall>') {
     return await new Promise((resolve) => {
         try {

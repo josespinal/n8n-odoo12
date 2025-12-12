@@ -137,6 +137,26 @@ async function xmlRpcCall(client: Client, method: string, params: unknown[]): Pr
 	});
 }
 
+function escapeXml(value: string) {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&apos;');
+}
+
+export function buildAuthenticateProbeBody(db: string, username: string, password: string): string {
+	return (
+		"<?xml version='1.0'?><methodCall><methodName>authenticate</methodName><params>" +
+		`<param><value><string>${escapeXml(db)}</string></value></param>` +
+		`<param><value><string>${escapeXml(username)}</string></value></param>` +
+		`<param><value><string>${escapeXml(password)}</string></value></param>` +
+		'<param><value><struct></struct></value></param>' +
+		'</params></methodCall>'
+	);
+}
+
 export async function probeXmlRpcEndpoint(
 	endpoint: string,
 	headers?: IDataObject,

@@ -41,6 +41,7 @@ export interface IOdooResponceFields {
 type OdooCRUD = 'create' | 'update' | 'delete' | 'get' | 'getAll';
 export declare function odooGetDBName(databaseName: string | undefined, url: string): string;
 export declare function processNameValueFields(value?: IDataObject): IDataObject;
+export declare function buildAuthenticateProbeBody(db: string, username: string, password: string): string;
 export declare function probeXmlRpcEndpoint(endpoint: string, headers?: IDataObject, body?: string): Promise<string>;
 export declare function odooAuthenticate(db: string, username: string, password: string, url: string, extraHeaders?: IDataObject): Promise<number>;
 export declare function odooGetUserID(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, username: string, password: string, url: string, extraHeaders?: IDataObject): Promise<number>;

@@ -35,6 +35,7 @@ import {
 	odooGetUserID,
 	odooUpdate,
 	probeXmlRpcEndpoint,
+	buildAuthenticateProbeBody,
 	processNameValueFields,
 } from './GenericFunctions';
 
@@ -291,11 +292,18 @@ export class Tamesonodoo implements INodeType {
 				} catch (error) {
 					// Emit detailed information to n8n logs to aid troubleshooting
 					const endpoint = `${credentials?.url.replace(/\/$/, '')}/xmlrpc/2/common`;
-					const probe = await probeXmlRpcEndpoint(endpoint, customHeaders);
+					const versionProbe = await probeXmlRpcEndpoint(endpoint, customHeaders);
+					const authProbeBody = buildAuthenticateProbeBody(
+						odooGetDBName(credentials?.db, credentials?.url),
+						credentials?.username || '',
+						credentials?.password || '',
+					);
+					const authProbe = await probeXmlRpcEndpoint(endpoint, customHeaders, authProbeBody);
 					console.error('Odoo credential test failed', {
 						message: (error as Error).message,
 						stack: (error as Error).stack,
-						probe,
+						versionProbe,
+						authProbe,
 					});
 
 					return {
