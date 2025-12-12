@@ -1,9 +1,32 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.buildAuthenticateProbeBody = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
 const node_http_1 = require("node:http");
 const node_https_1 = require("node:https");
-const xmlrpc_1 = require("xmlrpc");
+const xmlrpc = __importStar(require("xmlrpc"));
 const n8n_workflow_1 = require("n8n-workflow");
 exports.mapOperationToXMLRPC = {
     create: 'create',
@@ -69,36 +92,6 @@ function normalizeHeaders(headers) {
     }
     return Object.keys(normalized).length ? normalized : undefined;
 }
-function createXmlRpcClient(service, url, headers) {
-    const cleanUrl = url.replace(/\/$/, '');
-    const baseHeaders = {
-        'User-Agent': 'n8n',
-        'Content-Type': 'text/xml',
-        Accept: 'text/xml',
-    };
-    const mergedHeaders = { ...baseHeaders, ...normalizeHeaders(headers) };
-    return (0, xmlrpc_1.createClient)({
-        url: `${cleanUrl}/xmlrpc/2/${service}`,
-        headers: mergedHeaders,
-    });
-}
-async function xmlRpcCall(client, method, params) {
-    return await new Promise((resolve, reject) => {
-        client.methodCall(method, params, (error, value) => {
-            if (error) {
-                // Helpful message when the server returns HTML (e.g. login/redirect) instead of XML-RPC.
-                console.log(error.message, error.res?.statusCode, error.res?.body);
-                if (typeof error.message === 'string' && error.message.includes('Unknown XML-RPC tag')) {
-                    const wrapped = new Error("Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common is reachable without redirects, and that authentication is correct.");
-                    wrapped.cause = error;
-                    return reject(wrapped);
-                }
-                return reject(error);
-            }
-            resolve(value);
-        });
-    });
-}
 function escapeXml(value) {
     return value
         .replace(/&/g, '&amp;')
@@ -116,6 +109,61 @@ function buildAuthenticateProbeBody(db, username, password) {
         '</params></methodCall>');
 }
 exports.buildAuthenticateProbeBody = buildAuthenticateProbeBody;
+function buildEndpoint(service, url) {
+    return `${url.replace(/\/$/, '')}/xmlrpc/2/${service}`;
+}
+async function xmlRpcRequest(service, url, methodName, params, extraHeaders) {
+    const endpoint = buildEndpoint(service, url);
+    const Serializer = xmlrpc.Serializer;
+    const serializer = new Serializer();
+    const xml = serializer.serializeMethodCall(methodName, params);
+    const headers = {
+        'User-Agent': 'n8n',
+        'Content-Type': 'text/xml',
+        Accept: 'text/xml',
+        ...(normalizeHeaders(extraHeaders) || {}),
+    };
+    return await new Promise((resolve, reject) => {
+        try {
+            const parsed = new URL(endpoint);
+            const transport = parsed.protocol === 'https:' ? node_https_1.request : node_http_1.request;
+            const req = transport({
+                method: 'POST',
+                hostname: parsed.hostname,
+                port: parsed.port,
+                path: parsed.pathname,
+                headers,
+            }, (res) => {
+                const Deserializer = xmlrpc.Deserializer;
+                const deserializer = new Deserializer();
+                deserializer.deserializeMethodResponse(res, (err, value) => {
+                    if (err)
+                        return reject(err);
+                    resolve(value);
+                });
+            });
+            req.on('error', (err) => reject(err));
+            req.write(xml);
+            req.end();
+        }
+        catch (error) {
+            reject(error);
+        }
+    });
+}
+async function xmlRpcCall(service, url, method, params, extraHeaders) {
+    try {
+        return await xmlRpcRequest(service, url, method, params, extraHeaders);
+    }
+    catch (error) {
+        if (typeof error.message === 'string' && error.message.includes('Unknown XML-RPC tag')) {
+            const wrapped = new Error("Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common and /xmlrpc/2/object are reachable without redirects, and that authentication is correct.");
+            wrapped.cause = error;
+            throw wrapped;
+        }
+        throw error;
+    }
+}
 async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0"?><methodCall><methodName>version</methodName><params></params></methodCall>') {
     return await new Promise((resolve) => {
         try {
@@ -156,15 +204,13 @@ async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0
 }
 exports.probeXmlRpcEndpoint = probeXmlRpcEndpoint;
 async function odooAuthenticate(db, username, password, url, extraHeaders) {
-    const client = createXmlRpcClient('common', url, extraHeaders);
-    const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);
+    const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
     return Number(uid);
 }
 exports.odooAuthenticate = odooAuthenticate;
 async function odooGetUserID(db, username, password, url, extraHeaders) {
     try {
-        const client = createXmlRpcClient('common', url, extraHeaders);
-        const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);
+        const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
         return Number(uid);
     }
     catch (error) {
@@ -174,8 +220,7 @@ async function odooGetUserID(db, username, password, url, extraHeaders) {
 exports.odooGetUserID = odooGetUserID;
 async function odooGetServerVersion(url, extraHeaders) {
     try {
-        const client = createXmlRpcClient('common', url, extraHeaders);
-        return await xmlRpcCall(client, 'version', []);
+        return await xmlRpcCall('common', url, 'version', [], extraHeaders);
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
@@ -184,8 +229,7 @@ async function odooGetServerVersion(url, extraHeaders) {
 exports.odooGetServerVersion = odooGetServerVersion;
 async function executeKw(db, userID, password, model, method, args, kwargs = {}, url, extraHeaders) {
     try {
-        const client = createXmlRpcClient('object', url || '', extraHeaders);
-        return await xmlRpcCall(client, 'execute_kw', [db, userID, password, model, method, args, kwargs]);
+        return await xmlRpcCall('object', url || '', 'execute_kw', [db, userID, password, model, method, args, kwargs], extraHeaders);
     }
     catch (error) {
         let probe;

@@ -1,6 +1,6 @@
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { createClient, type Client } from 'xmlrpc';
+import * as xmlrpc from 'xmlrpc';
 
 import type {
 	IDataObject,
@@ -102,41 +102,6 @@ function normalizeHeaders(headers?: IDataObject): Record<string, string> | undef
 	return Object.keys(normalized).length ? normalized : undefined;
 }
 
-function createXmlRpcClient(service: 'common' | 'object', url: string, headers?: IDataObject): Client {
-	const cleanUrl = url.replace(/\/$/, '');
-	const baseHeaders = {
-		'User-Agent': 'n8n',
-		'Content-Type': 'text/xml',
-		Accept: 'text/xml',
-	};
-	const mergedHeaders = { ...baseHeaders, ...normalizeHeaders(headers) };
-	return createClient({
-		url: `${cleanUrl}/xmlrpc/2/${service}`,
-		headers: mergedHeaders,
-	});
-}
-
-async function xmlRpcCall(client: Client, method: string, params: unknown[]): Promise<any> {
-	return await new Promise((resolve, reject) => {
-		client.methodCall(method, params, (error, value) => {
-			if (error) {
-				// Helpful message when the server returns HTML (e.g. login/redirect) instead of XML-RPC.
-				console.log((error as any).message, (error as any).res?.statusCode, (error as any).res?.body);
-
-				if (typeof (error as any).message === 'string' && (error as any).message.includes('Unknown XML-RPC tag')) {
-					const wrapped = new Error(
-						"Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common is reachable without redirects, and that authentication is correct.",
-					);
-					(wrapped as any).cause = error;
-					return reject(wrapped);
-				}
-				return reject(error);
-			}
-			resolve(value);
-		});
-	});
-}
-
 function escapeXml(value: string) {
 	return value
 		.replace(/&/g, '&amp;')
@@ -155,6 +120,79 @@ export function buildAuthenticateProbeBody(db: string, username: string, passwor
 		'<param><value><struct></struct></value></param>' +
 		'</params></methodCall>'
 	);
+}
+
+function buildEndpoint(service: 'common' | 'object', url: string) {
+	return `${url.replace(/\/$/, '')}/xmlrpc/2/${service}`;
+}
+
+async function xmlRpcRequest(
+	service: 'common' | 'object',
+	url: string,
+	methodName: string,
+	params: unknown[],
+	extraHeaders?: IDataObject,
+): Promise<any> {
+	const endpoint = buildEndpoint(service, url);
+	const Serializer = (xmlrpc as any).Serializer;
+	const serializer = new Serializer();
+	const xml = serializer.serializeMethodCall(methodName, params);
+	const headers = {
+		'User-Agent': 'n8n',
+		'Content-Type': 'text/xml',
+		Accept: 'text/xml',
+		...(normalizeHeaders(extraHeaders) || {}),
+	};
+
+	return await new Promise((resolve, reject) => {
+		try {
+			const parsed = new URL(endpoint);
+			const transport = parsed.protocol === 'https:' ? httpsRequest : httpRequest;
+			const req = transport(
+				{
+					method: 'POST',
+					hostname: parsed.hostname,
+					port: parsed.port,
+					path: parsed.pathname,
+					headers,
+				},
+				(res) => {
+					const Deserializer = (xmlrpc as any).Deserializer;
+					const deserializer = new Deserializer();
+					deserializer.deserializeMethodResponse(res, (err: Error | null, value: unknown) => {
+						if (err) return reject(err);
+						resolve(value);
+					});
+				},
+			);
+			req.on('error', (err) => reject(err));
+			req.write(xml);
+			req.end();
+		} catch (error) {
+			reject(error);
+		}
+	});
+}
+
+async function xmlRpcCall(
+	service: 'common' | 'object',
+	url: string,
+	method: string,
+	params: unknown[],
+	extraHeaders?: IDataObject,
+) {
+	try {
+		return await xmlRpcRequest(service, url, method, params, extraHeaders);
+	} catch (error) {
+		if (typeof (error as any).message === 'string' && (error as any).message.includes('Unknown XML-RPC tag')) {
+			const wrapped = new Error(
+				"Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common and /xmlrpc/2/object are reachable without redirects, and that authentication is correct.",
+			);
+			(wrapped as any).cause = error;
+			throw wrapped;
+		}
+		throw error;
+	}
 }
 
 export async function probeXmlRpcEndpoint(
@@ -210,8 +248,7 @@ export async function odooAuthenticate(
 	url: string,
 	extraHeaders?: IDataObject,
 ): Promise<number> {
-	const client = createXmlRpcClient('common', url, extraHeaders);
-	const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);
+	const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
 	return Number(uid);
 }
 
@@ -224,8 +261,7 @@ export async function odooGetUserID(
 	extraHeaders?: IDataObject,
 ): Promise<number> {
 	try {
-		const client = createXmlRpcClient('common', url, extraHeaders);
-		const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);
+		const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
 		return Number(uid);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
@@ -238,8 +274,7 @@ export async function odooGetServerVersion(
 	extraHeaders?: IDataObject,
 ): Promise<IDataObject | IDataObject[]> {
 	try {
-		const client = createXmlRpcClient('common', url, extraHeaders);
-		return await xmlRpcCall(client, 'version', []);
+		return await xmlRpcCall('common', url, 'version', [], extraHeaders);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -258,8 +293,13 @@ async function executeKw(
 	extraHeaders?: IDataObject,
 ) {
 	try {
-		const client = createXmlRpcClient('object', url || '', extraHeaders);
-		return await xmlRpcCall(client, 'execute_kw', [db, userID, password, model, method, args, kwargs]);
+		return await xmlRpcCall(
+			'object',
+			url || '',
+			'execute_kw',
+			[db, userID, password, model, method, args, kwargs],
+			extraHeaders,
+		);
 	} catch (error) {
 		let probe: string | undefined;
 		try {
