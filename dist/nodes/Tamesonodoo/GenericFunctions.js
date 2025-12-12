@@ -23,9 +23,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.buildAuthenticateProbeBody = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
-const node_http_1 = require("node:http");
-const node_https_1 = require("node:https");
+exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.processNameValueFields = exports.buildAuthenticateProbeBody = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
+const http = __importStar(require("node:http"));
+const https = __importStar(require("node:https"));
 const xmlrpc = __importStar(require("xmlrpc"));
 const n8n_workflow_1 = require("n8n-workflow");
 exports.mapOperationToXMLRPC = {
@@ -62,6 +62,23 @@ function odooGetDBName(databaseName, url) {
     return odooURL.hostname.split('.')[0];
 }
 exports.odooGetDBName = odooGetDBName;
+function escapeXml(value) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+function buildAuthenticateProbeBody(db, username, password) {
+    return ("<?xml version='1.0'?><methodCall><methodName>authenticate</methodName><params>" +
+        `<param><value><string>${escapeXml(db)}</string></value></param>` +
+        `<param><value><string>${escapeXml(username)}</string></value></param>` +
+        `<param><value><string>${escapeXml(password)}</string></value></param>` +
+        '<param><value><struct></struct></value></param>' +
+        '</params></methodCall>');
+}
+exports.buildAuthenticateProbeBody = buildAuthenticateProbeBody;
 function processFilters(value) {
     const filters = value?.filter;
     return filters?.map((item) => {
@@ -92,83 +109,41 @@ function normalizeHeaders(headers) {
     }
     return Object.keys(normalized).length ? normalized : undefined;
 }
-function escapeXml(value) {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-}
-function buildAuthenticateProbeBody(db, username, password) {
-    return ("<?xml version='1.0'?><methodCall><methodName>authenticate</methodName><params>" +
-        `<param><value><string>${escapeXml(db)}</string></value></param>` +
-        `<param><value><string>${escapeXml(username)}</string></value></param>` +
-        `<param><value><string>${escapeXml(password)}</string></value></param>` +
-        '<param><value><struct></struct></value></param>' +
-        '</params></methodCall>');
-}
-exports.buildAuthenticateProbeBody = buildAuthenticateProbeBody;
-function buildEndpoint(service, url) {
-    return `${url.replace(/\/$/, '')}/xmlrpc/2/${service}`;
-}
-async function xmlRpcRequest(service, url, methodName, params, extraHeaders) {
-    const endpoint = buildEndpoint(service, url);
-    const Serializer = xmlrpc.Serializer;
-    const serializer = new Serializer();
-    const xml = serializer.serializeMethodCall(methodName, params);
-    const headers = {
+function createXmlRpcClient(service, url, headers) {
+    const cleanUrl = url.replace(/\/$/, '');
+    const baseHeaders = {
         'User-Agent': 'n8n',
         'Content-Type': 'text/xml',
         Accept: 'text/xml',
-        ...(normalizeHeaders(extraHeaders) || {}),
     };
-    return await new Promise((resolve, reject) => {
-        try {
-            const parsed = new URL(endpoint);
-            const transport = parsed.protocol === 'https:' ? node_https_1.request : node_http_1.request;
-            const req = transport({
-                method: 'POST',
-                hostname: parsed.hostname,
-                port: parsed.port,
-                path: parsed.pathname,
-                headers,
-            }, (res) => {
-                const Deserializer = xmlrpc.Deserializer;
-                const deserializer = new Deserializer();
-                deserializer.deserializeMethodResponse(res, (err, value) => {
-                    if (err)
-                        return reject(err);
-                    resolve(value);
-                });
-            });
-            req.on('error', (err) => reject(err));
-            req.write(xml);
-            req.end();
-        }
-        catch (error) {
-            reject(error);
-        }
-    });
+    const mergedHeaders = { ...baseHeaders, ...(normalizeHeaders(headers) || {}) };
+    const endpoint = `${cleanUrl}/xmlrpc/2/${service}`;
+    const isHttps = endpoint.startsWith('https:');
+    return isHttps
+        ? xmlrpc.createSecureClient({ url: endpoint, headers: mergedHeaders })
+        : xmlrpc.createClient({ url: endpoint, headers: mergedHeaders });
 }
 async function xmlRpcCall(service, url, method, params, extraHeaders) {
-    try {
-        return await xmlRpcRequest(service, url, method, params, extraHeaders);
-    }
-    catch (error) {
-        if (typeof error.message === 'string' && error.message.includes('Unknown XML-RPC tag')) {
-            const wrapped = new Error("Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common and /xmlrpc/2/object are reachable without redirects, and that authentication is correct.");
-            wrapped.cause = error;
-            throw wrapped;
-        }
-        throw error;
-    }
+    const client = createXmlRpcClient(service, url, extraHeaders);
+    return await new Promise((resolve, reject) => {
+        client.methodCall(method, params, (error, value) => {
+            if (error) {
+                if (typeof error?.message === 'string' && error.message.includes('Unknown XML-RPC tag')) {
+                    const wrapped = new Error("Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common and /xmlrpc/2/object are reachable without redirects, and that authentication is correct.");
+                    wrapped.cause = error;
+                    return reject(wrapped);
+                }
+                return reject(error);
+            }
+            resolve(value);
+        });
+    });
 }
 async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0"?><methodCall><methodName>version</methodName><params></params></methodCall>') {
     return await new Promise((resolve) => {
         try {
             const url = new URL(endpoint);
-            const transport = url.protocol === 'https:' ? node_https_1.request : node_http_1.request;
+            const transport = url.protocol === 'https:' ? https.request : http.request;
             const req = transport({
                 method: 'POST',
                 hostname: url.hostname,
@@ -220,7 +195,7 @@ async function odooGetUserID(db, username, password, url, extraHeaders) {
 exports.odooGetUserID = odooGetUserID;
 async function odooGetServerVersion(url, extraHeaders) {
     try {
-        return await xmlRpcCall('common', url, 'version', [], extraHeaders);
+        return (await xmlRpcCall('common', url, 'version', [], extraHeaders));
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
@@ -250,13 +225,13 @@ async function executeKw(db, userID, password, model, method, args, kwargs = {},
 }
 async function odooGetModelFields(db, userID, password, resource, url, extraHeaders) {
     const model = exports.mapOdooResources[resource] || resource;
-    const fields = await executeKw.call(this, db, userID, password, model, 'fields_get', [], { attributes: ['string', 'type', 'help', 'required', 'name'] }, url, extraHeaders);
+    const fields = (await executeKw.call(this, db, userID, password, model, 'fields_get', [], { attributes: ['string', 'type', 'help', 'required', 'name'] }, url, extraHeaders));
     return fields;
 }
 exports.odooGetModelFields = odooGetModelFields;
 async function odooCreate(db, userID, password, resource, operation, url, newItem, extraHeaders) {
     const model = exports.mapOdooResources[resource] || resource;
-    const result = await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [newItem || {}], {}, url, extraHeaders);
+    const result = (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [newItem || {}], {}, url, extraHeaders));
     return { id: result };
 }
 exports.odooCreate = odooCreate;
@@ -268,13 +243,13 @@ async function odooGet(db, userID, password, resource, operation, url, itemsID, 
         });
     }
     const model = exports.mapOdooResources[resource] || resource;
-    return await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID]], { fields: fieldsToReturn || [] }, url, extraHeaders);
+    return (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID]], { fields: fieldsToReturn || [] }, url, extraHeaders));
 }
 exports.odooGet = odooGet;
 async function odooCallMethod(db, userID, password, resource, url, callMethod, itemsIDs, extraHeaders) {
     const model = exports.mapOdooResources[resource] || resource;
     const ids = itemsIDs.split(',').map((x) => +x);
-    return await executeKw.call(this, db, userID, password, model, callMethod, [ids], {}, url, extraHeaders);
+    return (await executeKw.call(this, db, userID, password, model, callMethod, [ids], {}, url, extraHeaders));
 }
 exports.odooCallMethod = odooCallMethod;
 async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0, extraHeaders) {
@@ -287,7 +262,7 @@ async function odooGetAll(db, userID, password, resource, operation, url, filter
         kwargs.offset = offset;
     if (limit)
         kwargs.limit = limit;
-    return await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [domain], kwargs, url, extraHeaders);
+    return (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [domain], kwargs, url, extraHeaders));
 }
 exports.odooGetAll = odooGetAll;
 async function odooUpdate(db, userID, password, resource, operation, url, itemsID, fieldsToUpdate, extraHeaders) {

@@ -1,5 +1,5 @@
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import * as http from 'node:http';
+import * as https from 'node:https';
 import * as xmlrpc from 'xmlrpc';
 
 import type {
@@ -65,41 +65,10 @@ type OdooCRUD = 'create' | 'update' | 'delete' | 'get' | 'getAll';
 
 export function odooGetDBName(databaseName: string | undefined, url: string): string {
 	if (databaseName) return databaseName;
-
 	const odooURL = new URL(url);
 	const hostname = odooURL.hostname;
 	if (!hostname) return '';
-
 	return odooURL.hostname.split('.')[0];
-}
-
-function processFilters(value?: IDataObject) {
-	const filters = (value as IOdooFilterOperations | undefined)?.filter;
-	return filters?.map((item) => {
-		const operator = item.operator;
-		item.operator = mapFilterOperationToXMLRPC[operator as keyof typeof mapFilterOperationToXMLRPC];
-		return Object.values(item);
-	});
-}
-
-export function processNameValueFields(value?: IDataObject): IDataObject {
-	if (!value || typeof value !== 'object') return {};
-	const data = value as unknown as IOdooNameValueFields;
-	if (!Array.isArray(data.fields)) return {};
-
-	return data.fields.reduce((acc, record) => {
-		return { ...acc, [record.fieldName]: record.fieldValue };
-	}, {} as IDataObject);
-}
-
-function normalizeHeaders(headers?: IDataObject): Record<string, string> | undefined {
-	if (!headers || typeof headers !== 'object') return;
-	const normalized: Record<string, string> = {};
-	for (const [key, value] of Object.entries(headers)) {
-		if (value === undefined || value === null) continue;
-		normalized[key] = String(value);
-	}
-	return Object.keys(normalized).length ? normalized : undefined;
 }
 
 function escapeXml(value: string) {
@@ -122,56 +91,47 @@ export function buildAuthenticateProbeBody(db: string, username: string, passwor
 	);
 }
 
-function buildEndpoint(service: 'common' | 'object', url: string) {
-	return `${url.replace(/\/$/, '')}/xmlrpc/2/${service}`;
+function processFilters(value?: IDataObject) {
+	const filters = (value as IOdooFilterOperations | undefined)?.filter;
+	return filters?.map((item) => {
+		const operator = item.operator;
+		item.operator = mapFilterOperationToXMLRPC[operator as keyof typeof mapFilterOperationToXMLRPC];
+		return Object.values(item);
+	});
 }
 
-async function xmlRpcRequest(
-	service: 'common' | 'object',
-	url: string,
-	methodName: string,
-	params: unknown[],
-	extraHeaders?: IDataObject,
-): Promise<any> {
-	const endpoint = buildEndpoint(service, url);
-	const Serializer = (xmlrpc as any).Serializer;
-	const serializer = new Serializer();
-	const xml = serializer.serializeMethodCall(methodName, params);
-	const headers = {
+export function processNameValueFields(value?: IDataObject): IDataObject {
+	if (!value || typeof value !== 'object') return {};
+	const data = value as unknown as IOdooNameValueFields;
+	if (!Array.isArray(data.fields)) return {};
+	return data.fields.reduce((acc, record) => {
+		return { ...acc, [record.fieldName]: record.fieldValue };
+	}, {} as IDataObject);
+}
+
+function normalizeHeaders(headers?: IDataObject): Record<string, string> | undefined {
+	if (!headers || typeof headers !== 'object') return;
+	const normalized: Record<string, string> = {};
+	for (const [key, value] of Object.entries(headers)) {
+		if (value === undefined || value === null) continue;
+		normalized[key] = String(value);
+	}
+	return Object.keys(normalized).length ? normalized : undefined;
+}
+
+function createXmlRpcClient(service: 'common' | 'object', url: string, headers?: IDataObject) {
+	const cleanUrl = url.replace(/\/$/, '');
+	const baseHeaders = {
 		'User-Agent': 'n8n',
 		'Content-Type': 'text/xml',
 		Accept: 'text/xml',
-		...(normalizeHeaders(extraHeaders) || {}),
 	};
-
-	return await new Promise((resolve, reject) => {
-		try {
-			const parsed = new URL(endpoint);
-			const transport = parsed.protocol === 'https:' ? httpsRequest : httpRequest;
-			const req = transport(
-				{
-					method: 'POST',
-					hostname: parsed.hostname,
-					port: parsed.port,
-					path: parsed.pathname,
-					headers,
-				},
-				(res) => {
-					const Deserializer = (xmlrpc as any).Deserializer;
-					const deserializer = new Deserializer();
-					deserializer.deserializeMethodResponse(res, (err: Error | null, value: unknown) => {
-						if (err) return reject(err);
-						resolve(value);
-					});
-				},
-			);
-			req.on('error', (err) => reject(err));
-			req.write(xml);
-			req.end();
-		} catch (error) {
-			reject(error);
-		}
-	});
+	const mergedHeaders = { ...baseHeaders, ...(normalizeHeaders(headers) || {}) };
+	const endpoint = `${cleanUrl}/xmlrpc/2/${service}`;
+	const isHttps = endpoint.startsWith('https:');
+	return isHttps
+		? xmlrpc.createSecureClient({ url: endpoint, headers: mergedHeaders })
+		: xmlrpc.createClient({ url: endpoint, headers: mergedHeaders });
 }
 
 async function xmlRpcCall(
@@ -181,18 +141,22 @@ async function xmlRpcCall(
 	params: unknown[],
 	extraHeaders?: IDataObject,
 ) {
-	try {
-		return await xmlRpcRequest(service, url, method, params, extraHeaders);
-	} catch (error) {
-		if (typeof (error as any).message === 'string' && (error as any).message.includes('Unknown XML-RPC tag')) {
-			const wrapped = new Error(
-				"Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common and /xmlrpc/2/object are reachable without redirects, and that authentication is correct.",
-			);
-			(wrapped as any).cause = error;
-			throw wrapped;
-		}
-		throw error;
-	}
+	const client = createXmlRpcClient(service, url, extraHeaders);
+	return await new Promise((resolve, reject) => {
+		client.methodCall(method, params, (error: any, value: unknown) => {
+			if (error) {
+				if (typeof error?.message === 'string' && error.message.includes('Unknown XML-RPC tag')) {
+					const wrapped = new Error(
+						"Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common and /xmlrpc/2/object are reachable without redirects, and that authentication is correct.",
+					);
+					(wrapped as any).cause = error;
+					return reject(wrapped);
+				}
+				return reject(error);
+			}
+			resolve(value);
+		});
+	});
 }
 
 export async function probeXmlRpcEndpoint(
@@ -203,7 +167,7 @@ export async function probeXmlRpcEndpoint(
 	return await new Promise((resolve) => {
 		try {
 			const url = new URL(endpoint);
-			const transport = url.protocol === 'https:' ? httpsRequest : httpRequest;
+			const transport = url.protocol === 'https:' ? https.request : http.request;
 			const req = transport(
 				{
 					method: 'POST',
@@ -274,7 +238,9 @@ export async function odooGetServerVersion(
 	extraHeaders?: IDataObject,
 ): Promise<IDataObject | IDataObject[]> {
 	try {
-		return await xmlRpcCall('common', url, 'version', [], extraHeaders);
+		return (await xmlRpcCall('common', url, 'version', [], extraHeaders)) as
+			| IDataObject
+			| IDataObject[];
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -328,7 +294,7 @@ export async function odooGetModelFields(
 	extraHeaders?: IDataObject,
 ): Promise<IDataObject> {
 	const model = mapOdooResources[resource] || resource;
-	const fields = await executeKw.call(
+	const fields = (await executeKw.call(
 		this,
 		db,
 		userID,
@@ -339,7 +305,7 @@ export async function odooGetModelFields(
 		{ attributes: ['string', 'type', 'help', 'required', 'name'] },
 		url,
 		extraHeaders,
-	);
+	)) as IDataObject;
 	return fields as IDataObject;
 }
 
@@ -355,7 +321,7 @@ export async function odooCreate(
 	extraHeaders?: IDataObject,
 ): Promise<{ id: IDataObject | IDataObject[] }> {
 	const model = mapOdooResources[resource] || resource;
-	const result = await executeKw.call(
+	const result = (await executeKw.call(
 		this,
 		db,
 		userID,
@@ -366,7 +332,7 @@ export async function odooCreate(
 		{},
 		url,
 		extraHeaders,
-	);
+	)) as IDataObject | IDataObject[];
 	return { id: result };
 }
 
@@ -390,7 +356,7 @@ export async function odooGet(
 	}
 
 	const model = mapOdooResources[resource] || resource;
-	return await executeKw.call(
+	return (await executeKw.call(
 		this,
 		db,
 		userID,
@@ -401,7 +367,7 @@ export async function odooGet(
 		{ fields: fieldsToReturn || [] },
 		url,
 		extraHeaders,
-	);
+	)) as IDataObject | IDataObject[];
 }
 
 export async function odooCallMethod(
@@ -417,7 +383,7 @@ export async function odooCallMethod(
 ): Promise<IDataObject | IDataObject[]> {
 	const model = mapOdooResources[resource] || resource;
 	const ids = itemsIDs.split(',').map((x) => +x);
-	return await executeKw.call(
+	return (await executeKw.call(
 		this,
 		db,
 		userID,
@@ -428,7 +394,7 @@ export async function odooCallMethod(
 		{},
 		url,
 		extraHeaders,
-	);
+	)) as IDataObject | IDataObject[];
 }
 
 export async function odooGetAll(
@@ -453,7 +419,7 @@ export async function odooGetAll(
 	if (offset) kwargs.offset = offset;
 	if (limit) kwargs.limit = limit;
 
-	return await executeKw.call(
+	return (await executeKw.call(
 		this,
 		db,
 		userID,
@@ -464,7 +430,7 @@ export async function odooGetAll(
 		kwargs,
 		url,
 		extraHeaders,
-	);
+	)) as IDataObject | IDataObject[];
 }
 
 export async function odooUpdate(
