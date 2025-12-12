@@ -102,9 +102,15 @@ function normalizeHeaders(headers?: IDataObject): Record<string, string> | undef
 
 function createXmlRpcClient(service: 'common' | 'object', url: string, headers?: IDataObject): Client {
 	const cleanUrl = url.replace(/\/$/, '');
+	const baseHeaders = {
+		'User-Agent': 'n8n',
+		'Content-Type': 'text/xml',
+		Accept: 'text/xml',
+	};
+	const mergedHeaders = { ...baseHeaders, ...normalizeHeaders(headers) };
 	return createClient({
 		url: `${cleanUrl}/xmlrpc/2/${service}`,
-		headers: normalizeHeaders(headers),
+		headers: mergedHeaders,
 	});
 }
 

@@ -69,9 +69,15 @@ function normalizeHeaders(headers) {
 }
 function createXmlRpcClient(service, url, headers) {
     const cleanUrl = url.replace(/\/$/, '');
+    const baseHeaders = {
+        'User-Agent': 'n8n',
+        'Content-Type': 'text/xml',
+        Accept: 'text/xml',
+    };
+    const mergedHeaders = { ...baseHeaders, ...normalizeHeaders(headers) };
     return (0, xmlrpc_1.createClient)({
         url: `${cleanUrl}/xmlrpc/2/${service}`,
-        headers: normalizeHeaders(headers),
+        headers: mergedHeaders,
     });
 }
 async function xmlRpcCall(client, method, params) {
