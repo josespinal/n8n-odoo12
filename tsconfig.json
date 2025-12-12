@@ -16,6 +16,6 @@
 		"forceConsistentCasingInFileNames": true,
 		"types": ["node"]
 	},
-	"include": ["nodes/**/*.ts", "index.ts"],
+	"include": ["nodes/**/*.ts", "credentials/**/*.ts", "index.ts"],
 	"exclude": ["dist", "node_modules"]
 }

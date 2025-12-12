@@ -65,15 +65,17 @@ function processNameValueFields(value) {
         return { ...acc, [record.fieldName]: record.fieldValue };
     }, {});
 }
-async function odooJSONRPCRequest(body, url) {
+async function odooJSONRPCRequest(body, url, extraHeaders) {
     try {
+        const baseHeaders = {
+            'User-Agent': 'n8n',
+            Connection: 'keep-alive',
+            Accept: '*/*',
+            'Content-Type': 'application/json',
+        };
+        const headers = extraHeaders ? { ...baseHeaders, ...extraHeaders } : baseHeaders;
         const options = {
-            headers: {
-                'User-Agent': 'n8n',
-                Connection: 'keep-alive',
-                Accept: '*/*',
-                'Content-Type': 'application/json',
-            },
+            headers,
             method: 'POST',
             body,
             uri: `${url}/jsonrpc`,
@@ -91,7 +93,7 @@ async function odooJSONRPCRequest(body, url) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooGetModelFields(db, userID, password, resource, url) {
+async function odooGetModelFields(db, userID, password, resource, url, extraHeaders) {
     try {
         const body = {
             jsonrpc: '2.0',
@@ -111,13 +113,13 @@ async function odooGetModelFields(db, userID, password, resource, url) {
             },
             id: Math.floor(Math.random() * 100),
         };
-        return (await odooJSONRPCRequest.call(this, body, url));
+        return (await odooJSONRPCRequest.call(this, body, url, extraHeaders));
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooCreate(db, userID, password, resource, operation, url, newItem) {
+async function odooCreate(db, userID, password, resource, operation, url, newItem, extraHeaders) {
     try {
         const body = {
             jsonrpc: '2.0',
@@ -136,14 +138,14 @@ async function odooCreate(db, userID, password, resource, operation, url, newIte
             },
             id: Math.floor(Math.random() * 100),
         };
-        const result = await odooJSONRPCRequest.call(this, body, url);
+        const result = await odooJSONRPCRequest.call(this, body, url, extraHeaders);
         return { id: result };
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooGet(db, userID, password, resource, operation, url, itemsID, fieldsToReturn) {
+async function odooGet(db, userID, password, resource, operation, url, itemsID, fieldsToReturn, extraHeaders) {
     try {
         if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
             throw new n8n_workflow_1.NodeApiError(this.getNode(), {
@@ -169,13 +171,13 @@ async function odooGet(db, userID, password, resource, operation, url, itemsID, 
             },
             id: Math.floor(Math.random() * 100),
         };
-        return await odooJSONRPCRequest.call(this, body, url);
+        return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooCallMethod(db, userID, password, resource, url, callMethod, itemsIDs) {
+async function odooCallMethod(db, userID, password, resource, url, callMethod, itemsIDs, extraHeaders) {
     try {
         const body = {
             jsonrpc: '2.0',
@@ -194,13 +196,13 @@ async function odooCallMethod(db, userID, password, resource, url, callMethod, i
             },
             id: Math.floor(Math.random() * 100),
         };
-        return await odooJSONRPCRequest.call(this, body, url);
+        return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0) {
+async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0, extraHeaders) {
     try {
         const body = {
             jsonrpc: '2.0',
@@ -222,13 +224,13 @@ async function odooGetAll(db, userID, password, resource, operation, url, filter
             },
             id: Math.floor(Math.random() * 100),
         };
-        return await odooJSONRPCRequest.call(this, body, url);
+        return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooUpdate(db, userID, password, resource, operation, url, itemsID, fieldsToUpdate) {
+async function odooUpdate(db, userID, password, resource, operation, url, itemsID, fieldsToUpdate, extraHeaders) {
     try {
         if (!Object.keys(fieldsToUpdate).length) {
             throw new n8n_workflow_1.NodeApiError(this.getNode(), {
@@ -260,14 +262,14 @@ async function odooUpdate(db, userID, password, resource, operation, url, itemsI
             },
             id: Math.floor(Math.random() * 100),
         };
-        await odooJSONRPCRequest.call(this, body, url);
+        await odooJSONRPCRequest.call(this, body, url, extraHeaders);
         return { id: itemsID };
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooDelete(db, userID, password, resource, operation, url, itemsID) {
+async function odooDelete(db, userID, password, resource, operation, url, itemsID, extraHeaders) {
     if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), {
             status: 'Error',
@@ -292,14 +294,14 @@ async function odooDelete(db, userID, password, resource, operation, url, itemsI
             },
             id: Math.floor(Math.random() * 100),
         };
-        await odooJSONRPCRequest.call(this, body, url);
+        await odooJSONRPCRequest.call(this, body, url, extraHeaders);
         return { success: true };
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooGetUserID(db, username, password, url) {
+async function odooGetUserID(db, username, password, url, extraHeaders) {
     try {
         const body = {
             jsonrpc: '2.0',
@@ -311,14 +313,14 @@ async function odooGetUserID(db, username, password, url) {
             },
             id: Math.floor(Math.random() * 100),
         };
-        const loginResult = await odooJSONRPCRequest.call(this, body, url);
+        const loginResult = await odooJSONRPCRequest.call(this, body, url, extraHeaders);
         return Number(loginResult);
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
     }
 }
-async function odooGetServerVersion(url) {
+async function odooGetServerVersion(url, extraHeaders) {
     try {
         const body = {
             jsonrpc: '2.0',
@@ -330,7 +332,7 @@ async function odooGetServerVersion(url) {
             },
             id: Math.floor(Math.random() * 100),
         };
-        return await odooJSONRPCRequest.call(this, body, url);
+        return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
     }
     catch (error) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), error);

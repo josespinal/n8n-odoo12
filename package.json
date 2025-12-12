@@ -30,7 +30,9 @@
 	],
 	"n8n": {
 		"n8nNodesApiVersion": 1,
-		"credentials": [],
+		"credentials": [
+			"dist/credentials/OdooApi.credentials.js"
+		],
 		"nodes": [
 			"dist/nodes/Tamesonodoo/Tamesonodoo.node.js"
 		]

@@ -41,7 +41,25 @@ type OdooCredentials = {
 	username: string;
 	password: string;
 	db?: string;
+	useCustomHeaders?: boolean;
+	customHeaders?: {
+		headers?: Array<{
+			headerName: string;
+			headerValue: string;
+		}>;
+	};
 };
+
+function getCustomHeaders(credentials: OdooCredentials): IDataObject | undefined {
+	if (!credentials.useCustomHeaders) return;
+	const headers = credentials.customHeaders?.headers ?? [];
+	const pairs = headers
+		.filter((h) => h.headerName && h.headerValue)
+		.map((h) => [h.headerName, h.headerValue]);
+
+	if (!pairs.length) return;
+	return Object.fromEntries(pairs);
+}
 
 export class Tamesonodoo implements INodeType {
 	description: INodeTypeDescription = {
@@ -115,9 +133,18 @@ export class Tamesonodoo implements INodeType {
 				const url = credentials.url;
 				const username = credentials.username;
 				const password = credentials.password;
+				const customHeaders = getCustomHeaders(credentials);
 				const db = odooGetDBName(credentials.db, url);
-				const userID = await odooGetUserID.call(this, db, username, password, url);
-				const responce = await odooGetModelFields.call(this, db, userID, password, resource, url);
+				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
+				const responce = await odooGetModelFields.call(
+					this,
+					db,
+					userID,
+					password,
+					resource,
+					url,
+					customHeaders,
+				);
 
 				const options = Object.entries(responce).map(([fname, field]) => {
 					const optionField = field as IDataObject;
@@ -138,8 +165,9 @@ export class Tamesonodoo implements INodeType {
 				const url = credentials.url;
 				const username = credentials.username;
 				const password = credentials.password;
+				const customHeaders = getCustomHeaders(credentials);
 				const db = odooGetDBName(credentials.db, url);
-				const userID = await odooGetUserID.call(this, db, username, password, url);
+				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
 				const body = {
 					jsonrpc: '2.0',
@@ -160,7 +188,12 @@ export class Tamesonodoo implements INodeType {
 					id: Math.floor(Math.random() * 100),
 				};
 
-				const responce = (await odooJSONRPCRequest.call(this, body, url)) as IDataObject[];
+				const responce = (await odooJSONRPCRequest.call(
+					this,
+					body,
+					url,
+					customHeaders,
+				)) as IDataObject[];
 				const options = responce.map((model) => {
 					return {
 						name: model.name as string,
@@ -176,8 +209,9 @@ export class Tamesonodoo implements INodeType {
 				const url = credentials.url;
 				const username = credentials.username;
 				const password = credentials.password;
+				const customHeaders = getCustomHeaders(credentials);
 				const db = odooGetDBName(credentials.db, url);
-				const userID = await odooGetUserID.call(this, db, username, password, url);
+				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
 				const body = {
 					jsonrpc: '2.0',
@@ -190,7 +224,12 @@ export class Tamesonodoo implements INodeType {
 					id: Math.floor(Math.random() * 100),
 				};
 
-				const responce = (await odooJSONRPCRequest.call(this, body, url)) as IDataObject[];
+				const responce = (await odooJSONRPCRequest.call(
+					this,
+					body,
+					url,
+					customHeaders,
+				)) as IDataObject[];
 				const options = responce.map((state) => {
 					return {
 						name: state.name as string,
@@ -207,8 +246,9 @@ export class Tamesonodoo implements INodeType {
 				const url = credentials.url;
 				const username = credentials.username;
 				const password = credentials.password;
+				const customHeaders = getCustomHeaders(credentials);
 				const db = odooGetDBName(credentials.db, url);
-				const userID = await odooGetUserID.call(this, db, username, password, url);
+				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
 				const body = {
 					jsonrpc: '2.0',
@@ -221,7 +261,12 @@ export class Tamesonodoo implements INodeType {
 					id: Math.floor(Math.random() * 100),
 				};
 
-				const responce = (await odooJSONRPCRequest.call(this, body, url)) as IDataObject[];
+				const responce = (await odooJSONRPCRequest.call(
+					this,
+					body,
+					url,
+					customHeaders,
+				)) as IDataObject[];
 				const options = responce.map((country) => {
 					return {
 						name: country.name as string,
@@ -240,6 +285,7 @@ export class Tamesonodoo implements INodeType {
 				credential: ICredentialsDecrypted,
 			): Promise<INodeCredentialTestResult> {
 				const credentials = credential.data as OdooCredentials;
+				const customHeaders = getCustomHeaders(credentials);
 
 				try {
 					const body = {
@@ -263,6 +309,7 @@ export class Tamesonodoo implements INodeType {
 							Connection: 'keep-alive',
 							Accept: '*/*',
 							'Content-Type': 'application/json',
+							...customHeaders,
 						},
 						method: 'POST',
 						body,
@@ -313,7 +360,8 @@ export class Tamesonodoo implements INodeType {
 		const username = credentials.username;
 		const password = credentials.password;
 		const db = odooGetDBName(credentials.db, url);
-		const userID = await odooGetUserID.call(this, db, username, password, url);
+		const customHeaders = getCustomHeaders(credentials);
+		const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
 		for (let i = 0; i < items.length; i++) {
 			try {
@@ -346,6 +394,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -360,6 +409,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							contactId,
+							customHeaders,
 						);
 					}
 
@@ -378,6 +428,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							contactId,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -392,16 +443,19 @@ export class Tamesonodoo implements INodeType {
 								db,
 								userID,
 								password,
-								resource,
-								operation,
-								url,
-								undefined,
-								fields,
-							);
-						} else {
-							const limit = this.getNodeParameter('limit', i) as number;
-							responseData = await odooGetAll.call(
-								this,
+							resource,
+							operation,
+							url,
+							undefined,
+							fields,
+							0,
+							0,
+							customHeaders,
+						);
+					} else {
+						const limit = this.getNodeParameter('limit', i) as number;
+						responseData = await odooGetAll.call(
+							this,
 								db,
 								userID,
 								password,
@@ -411,6 +465,8 @@ export class Tamesonodoo implements INodeType {
 								undefined,
 								fields,
 								limit,
+								0,
+								customHeaders,
 							);
 						}
 					}
@@ -440,6 +496,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							contactId,
 							updateFields,
+							customHeaders,
 						);
 					}
 				}
@@ -459,6 +516,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							processNameValueFields(fields),
+							customHeaders,
 						);
 					}
 
@@ -473,6 +531,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							customResourceId,
+							customHeaders,
 						);
 					}
 
@@ -491,6 +550,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							customResourceId,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -511,6 +571,9 @@ export class Tamesonodoo implements INodeType {
 								url,
 								filter,
 								fields,
+								0,
+								0,
+								customHeaders,
 							);
 						} else {
 							const offset = this.getNodeParameter('offset', i) as number;
@@ -528,6 +591,7 @@ export class Tamesonodoo implements INodeType {
 								fields,
 								limit,
 								offset,
+								customHeaders,
 							);
 						}
 					}
@@ -545,6 +609,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							methodName,
 							itemsIDs,
+							customHeaders,
 						);
 					}
 
@@ -562,6 +627,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							customResourceId,
 							processNameValueFields(fields),
+							customHeaders,
 						);
 					}
 				}
@@ -582,6 +648,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -596,6 +663,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							noteId,
+							customHeaders,
 						);
 					}
 
@@ -614,6 +682,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							noteId,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -633,6 +702,9 @@ export class Tamesonodoo implements INodeType {
 								url,
 								undefined,
 								fields,
+								0,
+								0,
+								customHeaders,
 							);
 						} else {
 							const limit = this.getNodeParameter('limit', i) as number;
@@ -647,6 +719,8 @@ export class Tamesonodoo implements INodeType {
 								undefined,
 								fields,
 								limit,
+								0,
+								customHeaders,
 							);
 						}
 					}
@@ -668,6 +742,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							noteId,
 							fields,
+							customHeaders,
 						);
 					}
 				}
@@ -690,6 +765,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -704,6 +780,7 @@ export class Tamesonodoo implements INodeType {
 							operation,
 							url,
 							opportunityId,
+							customHeaders,
 						);
 					}
 
@@ -722,6 +799,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							opportunityId,
 							fields,
+							customHeaders,
 						);
 					}
 
@@ -741,6 +819,9 @@ export class Tamesonodoo implements INodeType {
 								url,
 								undefined,
 								fields,
+								0,
+								0,
+								customHeaders,
 							);
 						} else {
 							const limit = this.getNodeParameter('limit', i) as number;
@@ -756,6 +837,8 @@ export class Tamesonodoo implements INodeType {
 								undefined,
 								fields,
 								limit,
+								0,
+								customHeaders,
 							);
 						}
 					}
@@ -774,6 +857,7 @@ export class Tamesonodoo implements INodeType {
 							url,
 							opportunityId,
 							updateFields,
+							customHeaders,
 						);
 					}
 				}

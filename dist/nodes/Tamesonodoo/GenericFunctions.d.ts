@@ -41,21 +41,21 @@ export interface IOdooResponceFields {
 type OdooCRUD = 'create' | 'update' | 'delete' | 'get' | 'getAll';
 export declare function odooGetDBName(databaseName: string | undefined, url: string): string;
 export declare function processNameValueFields(value?: IDataObject): IDataObject;
-export declare function odooJSONRPCRequest(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, body: IDataObject, url: string): Promise<any>;
-export declare function odooGetModelFields(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string): Promise<IDataObject>;
-export declare function odooCreate(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, newItem: IDataObject): Promise<{
+export declare function odooJSONRPCRequest(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, body: IDataObject, url: string, extraHeaders?: IDataObject): Promise<any>;
+export declare function odooGetModelFields(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string, extraHeaders?: IDataObject): Promise<IDataObject>;
+export declare function odooCreate(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, newItem: IDataObject, extraHeaders?: IDataObject): Promise<{
     id: IDataObject | IDataObject[];
 }>;
-export declare function odooGet(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, fieldsToReturn?: IDataObject[]): Promise<IDataObject | IDataObject[]>;
-export declare function odooCallMethod(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string, callMethod: string, itemsIDs: string): Promise<IDataObject | IDataObject[]>;
-export declare function odooGetAll(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, filters?: IDataObject, fieldsToReturn?: IDataObject[], limit?: number, offset?: number): Promise<IDataObject | IDataObject[]>;
-export declare function odooUpdate(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, fieldsToUpdate: IDataObject): Promise<{
+export declare function odooGet(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, fieldsToReturn?: IDataObject[], extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
+export declare function odooCallMethod(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string, callMethod: string, itemsIDs: string, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
+export declare function odooGetAll(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, filters?: IDataObject, fieldsToReturn?: IDataObject[], limit?: number, offset?: number, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
+export declare function odooUpdate(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, fieldsToUpdate: IDataObject, extraHeaders?: IDataObject): Promise<{
     id: string;
 }>;
-export declare function odooDelete(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string): Promise<{
+export declare function odooDelete(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, extraHeaders?: IDataObject): Promise<{
     success: boolean;
 }>;
-export declare function odooGetUserID(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, username: string, password: string, url: string): Promise<number>;
-export declare function odooGetServerVersion(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, url: string): Promise<IDataObject | IDataObject[]>;
+export declare function odooGetUserID(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, username: string, password: string, url: string, extraHeaders?: IDataObject): Promise<number>;
+export declare function odooGetServerVersion(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, url: string, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
 export {};
 //# sourceMappingURL=GenericFunctions.d.ts.map

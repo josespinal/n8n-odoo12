@@ -93,15 +93,20 @@ export async function odooJSONRPCRequest(
 	this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions,
 	body: IDataObject,
 	url: string,
+	extraHeaders?: IDataObject,
 ): Promise<any> {
 	try {
+		const baseHeaders = {
+			'User-Agent': 'n8n',
+			Connection: 'keep-alive',
+			Accept: '*/*',
+			'Content-Type': 'application/json',
+		};
+
+		const headers = extraHeaders ? { ...baseHeaders, ...extraHeaders } : baseHeaders;
+
 		const options: IRequestOptions = {
-			headers: {
-				'User-Agent': 'n8n',
-				Connection: 'keep-alive',
-				Accept: '*/*',
-				'Content-Type': 'application/json',
-			},
+			headers,
 			method: 'POST',
 			body,
 			uri: `${url}/jsonrpc`,
@@ -128,6 +133,7 @@ export async function odooGetModelFields(
 	password: string,
 	resource: string,
 	url: string,
+	extraHeaders?: IDataObject,
 ): Promise<IDataObject> {
 	try {
 		const body = {
@@ -149,7 +155,7 @@ export async function odooGetModelFields(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		return (await odooJSONRPCRequest.call(this, body, url)) as IDataObject;
+		return (await odooJSONRPCRequest.call(this, body, url, extraHeaders)) as IDataObject;
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -164,6 +170,7 @@ export async function odooCreate(
 	operation: OdooCRUD,
 	url: string,
 	newItem: IDataObject,
+	extraHeaders?: IDataObject,
 ): Promise<{ id: IDataObject | IDataObject[] }> {
 	try {
 		const body = {
@@ -184,7 +191,7 @@ export async function odooCreate(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		const result = await odooJSONRPCRequest.call(this, body, url);
+		const result = await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 		return { id: result };
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
@@ -201,6 +208,7 @@ export async function odooGet(
 	url: string,
 	itemsID: string,
 	fieldsToReturn?: IDataObject[],
+	extraHeaders?: IDataObject,
 ): Promise<IDataObject | IDataObject[]> {
 	try {
 		if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
@@ -229,7 +237,7 @@ export async function odooGet(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		return await odooJSONRPCRequest.call(this, body, url);
+		return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -244,6 +252,7 @@ export async function odooCallMethod(
 	url: string,
 	callMethod: string,
 	itemsIDs: string,
+	extraHeaders?: IDataObject,
 ): Promise<IDataObject | IDataObject[]> {
 	try {
 		const body = {
@@ -264,7 +273,7 @@ export async function odooCallMethod(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		return await odooJSONRPCRequest.call(this, body, url);
+		return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -282,6 +291,7 @@ export async function odooGetAll(
 	fieldsToReturn?: IDataObject[],
 	limit = 0,
 	offset = 0,
+	extraHeaders?: IDataObject,
 ): Promise<IDataObject | IDataObject[]> {
 	try {
 		const body = {
@@ -305,7 +315,7 @@ export async function odooGetAll(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		return await odooJSONRPCRequest.call(this, body, url);
+		return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
@@ -321,6 +331,7 @@ export async function odooUpdate(
 	url: string,
 	itemsID: string,
 	fieldsToUpdate: IDataObject,
+	extraHeaders?: IDataObject,
 ): Promise<{ id: string }> {
 	try {
 		if (!Object.keys(fieldsToUpdate).length) {
@@ -356,7 +367,7 @@ export async function odooUpdate(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		await odooJSONRPCRequest.call(this, body, url);
+		await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 		return { id: itemsID };
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
@@ -372,6 +383,7 @@ export async function odooDelete(
 	operation: OdooCRUD,
 	url: string,
 	itemsID: string,
+	extraHeaders?: IDataObject,
 ): Promise<{ success: boolean }> {
 	if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
 		throw new NodeApiError(this.getNode(), {
@@ -399,7 +411,7 @@ export async function odooDelete(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		await odooJSONRPCRequest.call(this, body, url);
+		await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 		return { success: true };
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
@@ -412,6 +424,7 @@ export async function odooGetUserID(
 	username: string,
 	password: string,
 	url: string,
+	extraHeaders?: IDataObject,
 ): Promise<number> {
 	try {
 		const body = {
@@ -425,7 +438,7 @@ export async function odooGetUserID(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		const loginResult = await odooJSONRPCRequest.call(this, body, url);
+		const loginResult = await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 		return Number(loginResult);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
@@ -435,6 +448,7 @@ export async function odooGetUserID(
 export async function odooGetServerVersion(
 	this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions,
 	url: string,
+	extraHeaders?: IDataObject,
 ): Promise<IDataObject | IDataObject[]> {
 	try {
 		const body = {
@@ -448,7 +462,7 @@ export async function odooGetServerVersion(
 			id: Math.floor(Math.random() * 100),
 		};
 
-		return await odooJSONRPCRequest.call(this, body, url);
+		return await odooJSONRPCRequest.call(this, body, url, extraHeaders);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
