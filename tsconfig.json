@@ -13,6 +13,7 @@
 		"moduleResolution": "node",
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
 		"types": ["node"]
 	},
 	"include": ["nodes/**/*.ts", "index.ts"],
