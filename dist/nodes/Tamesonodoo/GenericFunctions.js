@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
+exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.processNameValueFields = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
+const node_http_1 = require("node:http");
+const node_https_1 = require("node:https");
 const xmlrpc_1 = require("xmlrpc");
 const n8n_workflow_1 = require("n8n-workflow");
 exports.mapOperationToXMLRPC = {
@@ -97,6 +99,45 @@ async function xmlRpcCall(client, method, params) {
         });
     });
 }
+async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0"?><methodCall><methodName>version</methodName><params></params></methodCall>') {
+    return await new Promise((resolve) => {
+        try {
+            const url = new URL(endpoint);
+            const transport = url.protocol === 'https:' ? node_https_1.request : node_http_1.request;
+            const req = transport({
+                method: 'POST',
+                hostname: url.hostname,
+                port: url.port,
+                path: url.pathname,
+                headers: {
+                    'Content-Type': 'text/xml',
+                    'User-Agent': 'n8n',
+                    Accept: 'text/xml',
+                    ...(normalizeHeaders(headers) || {}),
+                },
+            }, (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    if (data.length < 1000)
+                        data += chunk.toString();
+                });
+                res.on('end', () => {
+                    const snippet = data.slice(0, 500).replace(/\s+/g, ' ').trim();
+                    resolve(`status=${res.statusCode} location=${res.headers.location ?? ''} body="${snippet}"`);
+                });
+            });
+            req.on('error', (err) => {
+                resolve(`probe error: ${err.message}`);
+            });
+            req.write(body);
+            req.end();
+        }
+        catch (err) {
+            resolve(`probe error: ${err.message}`);
+        }
+    });
+}
+exports.probeXmlRpcEndpoint = probeXmlRpcEndpoint;
 async function odooAuthenticate(db, username, password, url, extraHeaders) {
     const client = createXmlRpcClient('common', url, extraHeaders);
     const uid = await xmlRpcCall(client, 'authenticate', [db, username, password, {}]);

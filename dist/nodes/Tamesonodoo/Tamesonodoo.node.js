@@ -169,9 +169,12 @@ class Tamesonodoo {
                     }
                     catch (error) {
                         // Emit detailed information to n8n logs to aid troubleshooting
+                        const endpoint = `${credentials?.url.replace(/\/$/, '')}/xmlrpc/2/common`;
+                        const probe = await (0, GenericFunctions_1.probeXmlRpcEndpoint)(endpoint, customHeaders);
                         console.error('Odoo credential test failed', {
                             message: error.message,
                             stack: error.stack,
+                            probe,
                         });
                         return {
                             status: 'Error',

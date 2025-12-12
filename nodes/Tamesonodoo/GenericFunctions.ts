@@ -1,3 +1,5 @@
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { createClient, type Client } from 'xmlrpc';
 
 import type {
@@ -132,6 +134,52 @@ async function xmlRpcCall(client: Client, method: string, params: unknown[]): Pr
 			}
 			resolve(value);
 		});
+	});
+}
+
+export async function probeXmlRpcEndpoint(
+	endpoint: string,
+	headers?: IDataObject,
+	body = '<?xml version="1.0"?><methodCall><methodName>version</methodName><params></params></methodCall>',
+): Promise<string> {
+	return await new Promise((resolve) => {
+		try {
+			const url = new URL(endpoint);
+			const transport = url.protocol === 'https:' ? httpsRequest : httpRequest;
+			const req = transport(
+				{
+					method: 'POST',
+					hostname: url.hostname,
+					port: url.port,
+					path: url.pathname,
+					headers: {
+						'Content-Type': 'text/xml',
+						'User-Agent': 'n8n',
+						Accept: 'text/xml',
+						...(normalizeHeaders(headers) || {}),
+					},
+				},
+				(res) => {
+					let data = '';
+					res.on('data', (chunk) => {
+						if (data.length < 1000) data += chunk.toString();
+					});
+					res.on('end', () => {
+						const snippet = data.slice(0, 500).replace(/\s+/g, ' ').trim();
+						resolve(
+							`status=${res.statusCode} location=${res.headers.location ?? ''} body="${snippet}"`,
+						);
+					});
+				},
+			);
+			req.on('error', (err) => {
+				resolve(`probe error: ${err.message}`);
+			});
+			req.write(body);
+			req.end();
+		} catch (err) {
+			resolve(`probe error: ${(err as Error).message}`);
+		}
 	});
 }
 
