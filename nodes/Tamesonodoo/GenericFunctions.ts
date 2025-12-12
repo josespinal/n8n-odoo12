@@ -113,6 +113,8 @@ async function xmlRpcCall(client: Client, method: string, params: unknown[]): Pr
 		client.methodCall(method, params, (error, value) => {
 			if (error) {
 				// Helpful message when the server returns HTML (e.g. login/redirect) instead of XML-RPC.
+				console.log((error as any).message, (error as any).res?.statusCode, (error as any).res?.body);
+
 				if (typeof (error as any).message === 'string' && (error as any).message.includes('Unknown XML-RPC tag')) {
 					const wrapped = new Error(
 						"Received non-XML response from Odoo. Check the base URL (e.g. 'https://your-odoo-host'), ensure /xmlrpc/2/common is reachable without redirects, and that authentication is correct.",
@@ -180,7 +182,7 @@ async function executeKw(
 	kwargs: IDataObject = {},
 	url?: string,
 	extraHeaders?: IDataObject,
-	) {
+) {
 	try {
 		const client = createXmlRpcClient('object', url || '', extraHeaders);
 		return await xmlRpcCall(client, 'execute_kw', [db, userID, password, model, method, args, kwargs]);
