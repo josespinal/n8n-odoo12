@@ -1,0 +1,375 @@
+import { INodeProperties } from 'n8n-workflow';
+
+export const customResourceOperations: INodeProperties[] = [
+	{
+		displayName: 'Custom Resource Name or ID',
+		name: 'customResource',
+		type: 'options',
+		description:
+			'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+		default: '',
+		typeOptions: {
+			loadOptionsMethod: 'getModels',
+		},
+		displayOptions: {
+			show: {
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		default: 'create',
+		noDataExpression: true,
+		displayOptions: {
+			show: {
+				resource: ['custom'],
+			},
+		},
+		options: [
+			{
+				name: 'Call Method',
+				value: 'callMethod',
+				description: 'Call a method on object',
+				action: 'Call a method on object',
+			},
+			{
+				name: 'Create',
+				value: 'create',
+				description: 'Create a new item',
+				action: 'Create an item',
+			},
+			{
+				name: 'Delete',
+				value: 'delete',
+				description: 'Delete an item',
+				action: 'Delete an item',
+			},
+			{
+				name: 'Get',
+				value: 'get',
+				description: 'Get an item',
+				action: 'Get an item',
+			},
+			{
+				name: 'Get Many',
+				value: 'getAll',
+				description: 'Get many items',
+				action: 'Get many items',
+			},
+			{
+				name: 'Update',
+				value: 'update',
+				description: 'Update an item',
+				action: 'Update an item',
+			},
+		],
+	},
+];
+
+export const customResourceDescription: INodeProperties[] = [
+	{
+		displayName: 'Fields',
+		name: 'fieldsToCreateOrUpdate',
+		type: 'fixedCollection',
+		typeOptions: {
+			multipleValues: true,
+			multipleValueButtonText: 'Add Field',
+		},
+		default: {},
+		placeholder: 'Add Field',
+		displayOptions: {
+			show: {
+				operation: ['create'],
+				resource: ['custom'],
+			},
+		},
+		options: [
+			{
+				displayName: 'Field Record:',
+				name: 'fields',
+				values: [
+					{
+						displayName: 'Field Name or ID',
+						name: 'fieldName',
+						type: 'options',
+						description:
+							'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+						default: '',
+						typeOptions: {
+							loadOptionsMethod: 'getModelFields',
+						},
+					},
+					{
+						displayName: 'New Value',
+						name: 'fieldValue',
+						type: 'string',
+						default: '',
+					},
+				],
+			},
+		],
+	},
+	{
+		displayName: 'Method Name',
+		name: 'methodName',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Call this method on the object or record',
+		displayOptions: {
+			show: {
+				operation: ['callMethod'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Record IDs',
+		name: 'itemsIDs',
+		type: 'string',
+		default: '',
+		description: 'Call this method on this records, input record IDs seperated by comma',
+		displayOptions: {
+			show: {
+				operation: ['callMethod'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Custom Resource ID',
+		name: 'customResourceId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['get', 'delete'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Return All',
+		name: 'returnAll',
+		type: 'boolean',
+		displayOptions: {
+			show: {
+				resource: ['custom'],
+				operation: ['getAll'],
+			},
+		},
+		default: false,
+		description: 'Whether to return all results or only up to a given limit',
+	},
+	{
+		displayName: 'Limit',
+		name: 'limit',
+		type: 'number',
+		default: 50,
+		displayOptions: {
+			show: {
+				resource: ['custom'],
+				operation: ['getAll'],
+				returnAll: [false],
+			},
+		},
+		typeOptions: {
+			minValue: 1,
+		},
+		description: 'Max number of results to return',
+	},
+	{
+		displayName: 'Offset',
+		name: 'offset',
+		type: 'number',
+		default: 0,
+		displayOptions: {
+			show: {
+				resource: ['custom'],
+				operation: ['getAll'],
+				returnAll: [false],
+			},
+		},
+		description: 'Offset number of records',
+	},
+	{
+		displayName: 'Options',
+		name: 'options',
+		type: 'collection',
+		default: {},
+		placeholder: 'Add Field',
+		displayOptions: {
+			show: {
+				operation: ['getAll', 'get'],
+				resource: ['custom'],
+			},
+		},
+		options: [
+			{
+				displayName: 'Fields to Include',
+				name: 'fieldsList',
+				type: 'multiOptions',
+				description:
+					'Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+				default: [],
+				typeOptions: {
+					loadOptionsMethod: 'getModelFields',
+					loadOptionsDependsOn: ['customResource'],
+				},
+			},
+		],
+	},
+	{
+		displayName: 'Filters',
+		name: 'filterRequest',
+		type: 'fixedCollection',
+		typeOptions: {
+			multipleValues: true,
+			multipleValueButtonText: 'Add Filter',
+		},
+		default: {},
+		description: 'Filter request by applying filters',
+		placeholder: 'Add condition',
+		displayOptions: {
+			show: {
+				operation: ['getAll'],
+				resource: ['custom'],
+			},
+		},
+		options: [
+			{
+				name: 'filter',
+				displayName: 'Filter',
+				values: [
+					{
+						displayName: 'Field Name or ID',
+						name: 'fieldName',
+						type: 'options',
+						description:
+							'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+						default: '',
+						typeOptions: {
+							loadOptionsDependsOn: ['customResource'],
+							loadOptionsMethod: 'getModelFields',
+						},
+					},
+					{
+						displayName: 'Operator',
+						name: 'operator',
+						type: 'options',
+						default: 'equal',
+						description: 'Specify an operator',
+						options: [
+							{
+								name: '!=',
+								value: 'notEqual',
+							},
+							{
+								name: '<',
+								value: 'lesserThen',
+							},
+							{
+								name: '<=',
+								value: 'lesserOrEqual',
+							},
+							{
+								name: '=',
+								value: 'equal',
+							},
+							{
+								name: '>',
+								value: 'greaterThen',
+							},
+							{
+								name: '>=',
+								value: 'greaterOrEqual',
+							},
+							{
+								name: 'Child Of',
+								value: 'childOf',
+							},
+							{
+								name: 'In',
+								value: 'in',
+							},
+							{
+								name: 'Like',
+								value: 'like',
+							},
+							{
+								name: 'Not In',
+								value: 'notIn',
+							},
+						],
+					},
+					{
+						displayName: 'Value',
+						name: 'value',
+						type: 'string',
+						default: '',
+						description: 'Specify value for comparison',
+					},
+				],
+			},
+		],
+	},
+	{
+		displayName: 'Custom Resource ID',
+		name: 'customResourceId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['update'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'fieldsToCreateOrUpdate',
+		type: 'fixedCollection',
+		typeOptions: {
+			multipleValues: true,
+			multipleValueButtonText: 'Add Field',
+		},
+		default: {},
+		placeholder: 'Add Field',
+		displayOptions: {
+			show: {
+				operation: ['update'],
+				resource: ['custom'],
+			},
+		},
+		options: [
+			{
+				displayName: 'Field Record:',
+				name: 'fields',
+				values: [
+					{
+						displayName: 'Field Name or ID',
+						name: 'fieldName',
+						type: 'options',
+						description:
+							'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+						default: '',
+						typeOptions: {
+							loadOptionsMethod: 'getModelFields',
+						},
+					},
+					{
+						displayName: 'New Value',
+						name: 'fieldValue',
+						type: 'string',
+						default: '',
+					},
+				],
+			},
+		],
+	},
+];
