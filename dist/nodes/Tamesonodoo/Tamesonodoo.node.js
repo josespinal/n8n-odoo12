@@ -39,6 +39,18 @@ class Tamesonodoo {
             ],
             properties: [
                 {
+                    displayName: 'Protocol',
+                    name: 'protocol',
+                    type: 'options',
+                    default: 'xmlrpc',
+                    noDataExpression: true,
+                    options: [
+                        { name: 'XML-RPC', value: 'xmlrpc' },
+                        { name: 'JSON-RPC', value: 'jsonrpc' },
+                    ],
+                    description: 'Choose the transport protocol to communicate with Odoo',
+                },
+                {
                     displayName: 'Resource',
                     name: 'resource',
                     type: 'options',
@@ -88,8 +100,9 @@ class Tamesonodoo {
                     const password = credentials.password;
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
-                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const responce = await GenericFunctions_1.odooGetModelFields.call(this, db, userID, password, resource, url, customHeaders);
+                    const protocol = this.getCurrentNodeParameter('protocol');
+                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders, protocol);
+                    const responce = await GenericFunctions_1.odooGetModelFields.call(this, db, userID, password, resource, url, customHeaders, protocol);
                     const options = Object.entries(responce).map(([fname, field]) => {
                         const optionField = field;
                         return {
@@ -107,8 +120,9 @@ class Tamesonodoo {
                     const password = credentials.password;
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
-                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'ir.model', 'getAll', url, undefined, ['name', 'model', 'modules'], 0, 0, customHeaders));
+                    const protocol = this.getCurrentNodeParameter('protocol');
+                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders, protocol);
+                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'ir.model', 'getAll', url, undefined, ['name', 'model', 'modules'], 0, 0, customHeaders, protocol));
                     const options = responce.map((model) => {
                         return {
                             name: model.name,
@@ -125,8 +139,9 @@ class Tamesonodoo {
                     const password = credentials.password;
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
-                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'res.country.state', 'getAll', url, undefined, ['id', 'name'], 0, 0, customHeaders));
+                    const protocol = this.getCurrentNodeParameter('protocol');
+                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders, protocol);
+                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'res.country.state', 'getAll', url, undefined, ['id', 'name'], 0, 0, customHeaders, protocol));
                     const options = responce.map((state) => {
                         return {
                             name: state.name,
@@ -142,8 +157,9 @@ class Tamesonodoo {
                     const password = credentials.password;
                     const customHeaders = getCustomHeaders(credentials);
                     const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
-                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
-                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'res.country', 'getAll', url, undefined, ['id', 'name'], 0, 0, customHeaders));
+                    const protocol = this.getCurrentNodeParameter('protocol');
+                    const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders, protocol);
+                    const responce = (await GenericFunctions_1.odooGetAll.call(this, db, userID, password, 'res.country', 'getAll', url, undefined, ['id', 'name'], 0, 0, customHeaders, protocol));
                     const options = responce.map((country) => {
                         return {
                             name: country.name,
@@ -159,7 +175,7 @@ class Tamesonodoo {
                     const customHeaders = getCustomHeaders(credentials);
                     try {
                         const db = (0, GenericFunctions_1.odooGetDBName)(credentials?.db, credentials?.url);
-                        const userId = await (0, GenericFunctions_1.odooAuthenticate)(db, credentials?.username, credentials?.password, credentials?.url, customHeaders);
+                        const userId = await GenericFunctions_1.odooAuthenticate.call(this, db, credentials?.username, credentials?.password, credentials?.url, customHeaders, 'xmlrpc');
                         if (!userId) {
                             return {
                                 status: 'Error',
@@ -179,6 +195,23 @@ class Tamesonodoo {
                             versionProbe,
                             authProbe,
                         });
+                        // Try JSON-RPC as a fallback
+                        try {
+                            const db = (0, GenericFunctions_1.odooGetDBName)(credentials?.db, credentials?.url);
+                            const uid = await GenericFunctions_1.odooAuthenticate.call(this, db, credentials?.username, credentials?.password, credentials?.url, customHeaders, 'jsonrpc');
+                            if (uid) {
+                                return {
+                                    status: 'OK',
+                                    message: 'Authentication successful (JSON-RPC fallback)!',
+                                };
+                            }
+                        }
+                        catch (jsonErr) {
+                            console.error('JSON-RPC credential fallback failed', {
+                                message: jsonErr.message,
+                                stack: jsonErr.stack,
+                            });
+                        }
                         return {
                             status: 'Error',
                             message: `Settings are not valid: ${error.message || error}`,
@@ -199,13 +232,14 @@ class Tamesonodoo {
         let responseData;
         const resource = this.getNodeParameter('resource', 0);
         const operation = this.getNodeParameter('operation', 0);
+        const protocol = this.getNodeParameter('protocol', 0);
         const credentials = (await this.getCredentials('odooApi'));
         const url = credentials.url.replace(/\/$/, '');
         const username = credentials.username;
         const password = credentials.password;
         const db = (0, GenericFunctions_1.odooGetDBName)(credentials.db, url);
         const customHeaders = getCustomHeaders(credentials);
-        const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders);
+        const userID = await GenericFunctions_1.odooGetUserID.call(this, db, username, password, url, customHeaders, protocol);
         for (let i = 0; i < items.length; i++) {
             try {
                 if (resource === 'contact') {
@@ -226,28 +260,28 @@ class Tamesonodoo {
                             name,
                             ...additionalFields,
                         };
-                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, resource, operation, url, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, resource, operation, url, fields, customHeaders, protocol);
                     }
                     if (operation === 'delete') {
                         const contactId = this.getNodeParameter('contactId', i);
-                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, resource, operation, url, contactId, customHeaders);
+                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, resource, operation, url, contactId, customHeaders, protocol);
                     }
                     if (operation === 'get') {
                         const contactId = this.getNodeParameter('contactId', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
-                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, resource, operation, url, contactId, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, resource, operation, url, contactId, fields, customHeaders, protocol);
                     }
                     if (operation === 'getAll') {
                         const returnAll = this.getNodeParameter('returnAll', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
                         if (returnAll) {
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, 0, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, 0, 0, customHeaders, protocol);
                         }
                         else {
                             const limit = this.getNodeParameter('limit', i);
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, limit, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, limit, 0, customHeaders, protocol);
                         }
                     }
                     if (operation === 'update') {
@@ -263,24 +297,24 @@ class Tamesonodoo {
                             }
                             delete updateFields.address;
                         }
-                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, resource, operation, url, contactId, updateFields, customHeaders);
+                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, resource, operation, url, contactId, updateFields, customHeaders, protocol);
                     }
                 }
                 if (resource === 'custom') {
                     const customResource = this.getNodeParameter('customResource', i);
                     if (operation === 'create') {
                         const fields = this.getNodeParameter('fieldsToCreateOrUpdate', i);
-                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, customResource, operation, url, (0, GenericFunctions_1.processNameValueFields)(fields), customHeaders);
+                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, customResource, operation, url, (0, GenericFunctions_1.processNameValueFields)(fields), customHeaders, protocol);
                     }
                     if (operation === 'delete') {
                         const customResourceId = this.getNodeParameter('customResourceId', i);
-                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, customResource, operation, url, customResourceId, customHeaders);
+                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, customResource, operation, url, customResourceId, customHeaders, protocol);
                     }
                     if (operation === 'get') {
                         const customResourceId = this.getNodeParameter('customResourceId', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
-                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, customResource, operation, url, customResourceId, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, customResource, operation, url, customResourceId, fields, customHeaders, protocol);
                     }
                     if (operation === 'getAll') {
                         const returnAll = this.getNodeParameter('returnAll', i);
@@ -288,23 +322,23 @@ class Tamesonodoo {
                         const fields = options.fieldsList || [];
                         const filter = this.getNodeParameter('filterRequest', i);
                         if (returnAll) {
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, customResource, operation, url, filter, fields, 0, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, customResource, operation, url, filter, fields, 0, 0, customHeaders, protocol);
                         }
                         else {
                             const offset = this.getNodeParameter('offset', i);
                             const limit = this.getNodeParameter('limit', i);
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, customResource, operation, url, filter, fields, limit, offset, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, customResource, operation, url, filter, fields, limit, offset, customHeaders, protocol);
                         }
                     }
                     if (operation === 'callMethod') {
                         const methodName = this.getNodeParameter('methodName', i);
                         const itemsIDs = this.getNodeParameter('itemsIDs', i);
-                        responseData = await GenericFunctions_1.odooCallMethod.call(this, db, userID, password, customResource, url, methodName, itemsIDs, customHeaders);
+                        responseData = await GenericFunctions_1.odooCallMethod.call(this, db, userID, password, customResource, url, methodName, itemsIDs, customHeaders, protocol);
                     }
                     if (operation === 'update') {
                         const customResourceId = this.getNodeParameter('customResourceId', i);
                         const fields = this.getNodeParameter('fieldsToCreateOrUpdate', i);
-                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, customResource, operation, url, customResourceId, (0, GenericFunctions_1.processNameValueFields)(fields), customHeaders);
+                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, customResource, operation, url, customResourceId, (0, GenericFunctions_1.processNameValueFields)(fields), customHeaders, protocol);
                     }
                 }
                 if (resource === 'note') {
@@ -313,28 +347,28 @@ class Tamesonodoo {
                         const fields = {
                             memo,
                         };
-                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, resource, operation, url, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, resource, operation, url, fields, customHeaders, protocol);
                     }
                     if (operation === 'delete') {
                         const noteId = this.getNodeParameter('noteId', i);
-                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, resource, operation, url, noteId, customHeaders);
+                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, resource, operation, url, noteId, customHeaders, protocol);
                     }
                     if (operation === 'get') {
                         const noteId = this.getNodeParameter('noteId', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
-                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, resource, operation, url, noteId, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, resource, operation, url, noteId, fields, customHeaders, protocol);
                     }
                     if (operation === 'getAll') {
                         const returnAll = this.getNodeParameter('returnAll', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
                         if (returnAll) {
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, 0, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, 0, 0, customHeaders, protocol);
                         }
                         else {
                             const limit = this.getNodeParameter('limit', i);
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, limit, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, limit, 0, customHeaders, protocol);
                         }
                     }
                     if (operation === 'update') {
@@ -343,7 +377,7 @@ class Tamesonodoo {
                         const fields = {
                             memo,
                         };
-                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, resource, operation, url, noteId, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, resource, operation, url, noteId, fields, customHeaders, protocol);
                     }
                 }
                 if (resource === 'opportunity') {
@@ -354,34 +388,34 @@ class Tamesonodoo {
                             name,
                             ...additionalFields,
                         };
-                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, resource, operation, url, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooCreate.call(this, db, userID, password, resource, operation, url, fields, customHeaders, protocol);
                     }
                     if (operation === 'delete') {
                         const opportunityId = this.getNodeParameter('opportunityId', i);
-                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, resource, operation, url, opportunityId, customHeaders);
+                        responseData = await GenericFunctions_1.odooDelete.call(this, db, userID, password, resource, operation, url, opportunityId, customHeaders, protocol);
                     }
                     if (operation === 'get') {
                         const opportunityId = this.getNodeParameter('opportunityId', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
-                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, resource, operation, url, opportunityId, fields, customHeaders);
+                        responseData = await GenericFunctions_1.odooGet.call(this, db, userID, password, resource, operation, url, opportunityId, fields, customHeaders, protocol);
                     }
                     if (operation === 'getAll') {
                         const returnAll = this.getNodeParameter('returnAll', i);
                         const options = this.getNodeParameter('options', i);
                         const fields = options.fieldsList || [];
                         if (returnAll) {
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, 0, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, 0, 0, customHeaders, protocol);
                         }
                         else {
                             const limit = this.getNodeParameter('limit', i);
-                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, limit, 0, customHeaders);
+                            responseData = await GenericFunctions_1.odooGetAll.call(this, db, userID, password, resource, operation, url, undefined, fields, limit, 0, customHeaders, protocol);
                         }
                     }
                     if (operation === 'update') {
                         const opportunityId = this.getNodeParameter('opportunityId', i);
                         const updateFields = this.getNodeParameter('updateFields', i);
-                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, resource, operation, url, opportunityId, updateFields, customHeaders);
+                        responseData = await GenericFunctions_1.odooUpdate.call(this, db, userID, password, resource, operation, url, opportunityId, updateFields, customHeaders, protocol);
                     }
                 }
                 if (Array.isArray(responseData)) {

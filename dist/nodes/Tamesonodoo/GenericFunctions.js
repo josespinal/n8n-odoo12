@@ -109,6 +109,9 @@ function normalizeHeaders(headers) {
     }
     return Object.keys(normalized).length ? normalized : undefined;
 }
+function mergeHeaders(base, extra) {
+    return { ...base, ...(normalizeHeaders(extra) || {}) };
+}
 function createXmlRpcClient(service, url, headers) {
     const cleanUrl = url.replace(/\/$/, '');
     const baseHeaders = {
@@ -138,6 +141,30 @@ async function xmlRpcCall(service, url, method, params, extraHeaders) {
             resolve(value);
         });
     });
+}
+async function jsonRpcRequest(url, body, extraHeaders) {
+    const baseHeaders = {
+        'User-Agent': 'n8n',
+        Connection: 'keep-alive',
+        Accept: '*/*',
+        'Content-Type': 'application/json',
+    };
+    const headers = mergeHeaders(baseHeaders, extraHeaders);
+    try {
+        return await this.helpers.request({
+            method: 'POST',
+            uri: `${url.replace(/\/$/, '')}/jsonrpc`,
+            headers,
+            body,
+            json: true,
+        });
+    }
+    catch (error) {
+        if (typeof this.getNode === 'function') {
+            throw new n8n_workflow_1.NodeApiError(this.getNode(), error);
+        }
+        throw error;
+    }
 }
 async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0"?><methodCall><methodName>version</methodName><params></params></methodCall>') {
     return await new Promise((resolve) => {
@@ -178,14 +205,45 @@ async function probeXmlRpcEndpoint(endpoint, headers, body = '<?xml version="1.0
     });
 }
 exports.probeXmlRpcEndpoint = probeXmlRpcEndpoint;
-async function odooAuthenticate(db, username, password, url, extraHeaders) {
+async function odooAuthenticate(db, username, password, url, extraHeaders, protocol = 'xmlrpc') {
+    if (protocol === 'jsonrpc') {
+        const body = {
+            jsonrpc: '2.0',
+            method: 'call',
+            params: {
+                service: 'common',
+                method: 'login',
+                args: [db, username, password],
+            },
+            id: Math.floor(Math.random() * 1000),
+        };
+        const res = (await jsonRpcRequest.call(this, url, body, extraHeaders));
+        return Number(res?.result);
+    }
     const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
     return Number(uid);
 }
 exports.odooAuthenticate = odooAuthenticate;
-async function odooGetUserID(db, username, password, url, extraHeaders) {
+async function odooGetUserID(db, username, password, url, extraHeaders, protocol = 'xmlrpc') {
     try {
-        const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
+        let uid;
+        if (protocol === 'jsonrpc') {
+            const body = {
+                jsonrpc: '2.0',
+                method: 'call',
+                params: {
+                    service: 'common',
+                    method: 'login',
+                    args: [db, username, password],
+                },
+                id: Math.floor(Math.random() * 1000),
+            };
+            const res = (await jsonRpcRequest.call(this, url, body, extraHeaders));
+            uid = res?.result;
+        }
+        else {
+            uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
+        }
         return Number(uid);
     }
     catch (error) {
@@ -193,8 +251,22 @@ async function odooGetUserID(db, username, password, url, extraHeaders) {
     }
 }
 exports.odooGetUserID = odooGetUserID;
-async function odooGetServerVersion(url, extraHeaders) {
+async function odooGetServerVersion(url, extraHeaders, protocol = 'xmlrpc') {
     try {
+        if (protocol === 'jsonrpc') {
+            const body = {
+                jsonrpc: '2.0',
+                method: 'call',
+                params: {
+                    service: 'common',
+                    method: 'version',
+                    args: [],
+                },
+                id: Math.floor(Math.random() * 1000),
+            };
+            const res = (await jsonRpcRequest.call(this, url, body, extraHeaders));
+            return res?.result || {};
+        }
         return (await xmlRpcCall('common', url, 'version', [], extraHeaders));
     }
     catch (error) {
@@ -202,8 +274,22 @@ async function odooGetServerVersion(url, extraHeaders) {
     }
 }
 exports.odooGetServerVersion = odooGetServerVersion;
-async function executeKw(db, userID, password, model, method, args, kwargs = {}, url, extraHeaders) {
+async function executeKw(db, userID, password, model, method, args, kwargs = {}, url, extraHeaders, protocol = 'xmlrpc') {
     try {
+        if (protocol === 'jsonrpc') {
+            const body = {
+                jsonrpc: '2.0',
+                method: 'call',
+                params: {
+                    service: 'object',
+                    method: 'execute_kw',
+                    args: [db, userID, password, model, method, args, kwargs],
+                },
+                id: Math.floor(Math.random() * 1000),
+            };
+            const res = (await jsonRpcRequest.call(this, url || '', body, extraHeaders));
+            return res?.result;
+        }
         return await xmlRpcCall('object', url || '', 'execute_kw', [db, userID, password, model, method, args, kwargs], extraHeaders);
     }
     catch (error) {
@@ -223,19 +309,19 @@ async function executeKw(db, userID, password, model, method, args, kwargs = {},
         });
     }
 }
-async function odooGetModelFields(db, userID, password, resource, url, extraHeaders) {
+async function odooGetModelFields(db, userID, password, resource, url, extraHeaders, protocol = 'xmlrpc') {
     const model = exports.mapOdooResources[resource] || resource;
-    const fields = (await executeKw.call(this, db, userID, password, model, 'fields_get', [], { attributes: ['string', 'type', 'help', 'required', 'name'] }, url, extraHeaders));
+    const fields = (await executeKw.call(this, db, userID, password, model, 'fields_get', [], { attributes: ['string', 'type', 'help', 'required', 'name'] }, url, extraHeaders, protocol));
     return fields;
 }
 exports.odooGetModelFields = odooGetModelFields;
-async function odooCreate(db, userID, password, resource, operation, url, newItem, extraHeaders) {
+async function odooCreate(db, userID, password, resource, operation, url, newItem, extraHeaders, protocol = 'xmlrpc') {
     const model = exports.mapOdooResources[resource] || resource;
-    const result = (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [newItem || {}], {}, url, extraHeaders));
+    const result = (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [newItem || {}], {}, url, extraHeaders, protocol));
     return { id: result };
 }
 exports.odooCreate = odooCreate;
-async function odooGet(db, userID, password, resource, operation, url, itemsID, fieldsToReturn, extraHeaders) {
+async function odooGet(db, userID, password, resource, operation, url, itemsID, fieldsToReturn, extraHeaders, protocol = 'xmlrpc') {
     if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), {
             status: 'Error',
@@ -243,16 +329,16 @@ async function odooGet(db, userID, password, resource, operation, url, itemsID, 
         });
     }
     const model = exports.mapOdooResources[resource] || resource;
-    return (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID]], { fields: fieldsToReturn || [] }, url, extraHeaders));
+    return (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID]], { fields: fieldsToReturn || [] }, url, extraHeaders, protocol));
 }
 exports.odooGet = odooGet;
-async function odooCallMethod(db, userID, password, resource, url, callMethod, itemsIDs, extraHeaders) {
+async function odooCallMethod(db, userID, password, resource, url, callMethod, itemsIDs, extraHeaders, protocol = 'xmlrpc') {
     const model = exports.mapOdooResources[resource] || resource;
     const ids = itemsIDs.split(',').map((x) => +x);
-    return (await executeKw.call(this, db, userID, password, model, callMethod, [ids], {}, url, extraHeaders));
+    return (await executeKw.call(this, db, userID, password, model, callMethod, [ids], {}, url, extraHeaders, protocol));
 }
 exports.odooCallMethod = odooCallMethod;
-async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0, extraHeaders) {
+async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0, extraHeaders, protocol = 'xmlrpc') {
     const model = exports.mapOdooResources[resource] || resource;
     const domain = processFilters(filters) || [];
     const kwargs = {
@@ -262,10 +348,10 @@ async function odooGetAll(db, userID, password, resource, operation, url, filter
         kwargs.offset = offset;
     if (limit)
         kwargs.limit = limit;
-    return (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [domain], kwargs, url, extraHeaders));
+    return (await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [domain], kwargs, url, extraHeaders, protocol));
 }
 exports.odooGetAll = odooGetAll;
-async function odooUpdate(db, userID, password, resource, operation, url, itemsID, fieldsToUpdate, extraHeaders) {
+async function odooUpdate(db, userID, password, resource, operation, url, itemsID, fieldsToUpdate, extraHeaders, protocol = 'xmlrpc') {
     if (!Object.keys(fieldsToUpdate).length) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), {
             status: 'Error',
@@ -279,11 +365,11 @@ async function odooUpdate(db, userID, password, resource, operation, url, itemsI
         });
     }
     const model = exports.mapOdooResources[resource] || resource;
-    await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID], fieldsToUpdate], {}, url, extraHeaders);
+    await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID], fieldsToUpdate], {}, url, extraHeaders, protocol);
     return { id: itemsID };
 }
 exports.odooUpdate = odooUpdate;
-async function odooDelete(db, userID, password, resource, operation, url, itemsID, extraHeaders) {
+async function odooDelete(db, userID, password, resource, operation, url, itemsID, extraHeaders, protocol = 'xmlrpc') {
     if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
         throw new n8n_workflow_1.NodeApiError(this.getNode(), {
             status: 'Error',
@@ -291,7 +377,7 @@ async function odooDelete(db, userID, password, resource, operation, url, itemsI
         });
     }
     const model = exports.mapOdooResources[resource] || resource;
-    await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID]], {}, url, extraHeaders);
+    await executeKw.call(this, db, userID, password, model, exports.mapOperationToXMLRPC[operation], [[+itemsID]], {}, url, extraHeaders, protocol);
     return { success: true };
 }
 exports.odooDelete = odooDelete;

@@ -8,9 +8,12 @@ import type {
 	IExecuteSingleFunctions,
 	IHookFunctions,
 	ILoadOptionsFunctions,
+	ICredentialTestFunctions,
 	JsonObject,
 } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
+
+export type OdooProtocol = 'xmlrpc' | 'jsonrpc';
 
 export const mapOperationToXMLRPC = {
 	create: 'create',
@@ -119,6 +122,13 @@ function normalizeHeaders(headers?: IDataObject): Record<string, string> | undef
 	return Object.keys(normalized).length ? normalized : undefined;
 }
 
+function mergeHeaders(
+	base: Record<string, string>,
+	extra?: IDataObject,
+): Record<string, string> {
+	return { ...base, ...(normalizeHeaders(extra) || {}) };
+}
+
 function createXmlRpcClient(service: 'common' | 'object', url: string, headers?: IDataObject) {
 	const cleanUrl = url.replace(/\/$/, '');
 	const baseHeaders = {
@@ -157,6 +167,41 @@ async function xmlRpcCall(
 			resolve(value);
 		});
 	});
+}
+
+async function jsonRpcRequest(
+	this:
+		| IHookFunctions
+		| IExecuteFunctions
+		| IExecuteSingleFunctions
+		| ILoadOptionsFunctions
+		| ICredentialTestFunctions,
+	url: string,
+	body: IDataObject,
+	extraHeaders?: IDataObject,
+) {
+	const baseHeaders = {
+		'User-Agent': 'n8n',
+		Connection: 'keep-alive',
+		Accept: '*/*',
+		'Content-Type': 'application/json',
+	};
+	const headers = mergeHeaders(baseHeaders, extraHeaders);
+
+	try {
+		return await this.helpers.request!({
+			method: 'POST',
+			uri: `${url.replace(/\/$/, '')}/jsonrpc`,
+			headers,
+			body,
+			json: true,
+		});
+	} catch (error) {
+		if (typeof (this as any).getNode === 'function') {
+			throw new NodeApiError((this as any).getNode(), error as JsonObject);
+		}
+		throw error;
+	}
 }
 
 export async function probeXmlRpcEndpoint(
@@ -206,12 +251,35 @@ export async function probeXmlRpcEndpoint(
 }
 
 export async function odooAuthenticate(
+	this:
+		| IHookFunctions
+		| IExecuteFunctions
+		| IExecuteSingleFunctions
+		| ILoadOptionsFunctions
+		| ICredentialTestFunctions
+		| undefined,
 	db: string,
 	username: string,
 	password: string,
 	url: string,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<number> {
+	if (protocol === 'jsonrpc') {
+		const body: IDataObject = {
+			jsonrpc: '2.0',
+			method: 'call',
+			params: {
+				service: 'common',
+				method: 'login',
+				args: [db, username, password],
+			},
+			id: Math.floor(Math.random() * 1000),
+		};
+		const res = (await jsonRpcRequest.call(this as any, url, body, extraHeaders)) as IDataObject;
+		return Number(res?.result);
+	}
+
 	const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
 	return Number(uid);
 }
@@ -223,9 +291,26 @@ export async function odooGetUserID(
 	password: string,
 	url: string,
 	extraHeaders?: IDataObject,
+ 	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<number> {
 	try {
-		const uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
+		let uid: unknown;
+		if (protocol === 'jsonrpc') {
+			const body: IDataObject = {
+				jsonrpc: '2.0',
+				method: 'call',
+				params: {
+					service: 'common',
+					method: 'login',
+					args: [db, username, password],
+				},
+				id: Math.floor(Math.random() * 1000),
+			};
+			const res = (await jsonRpcRequest.call(this, url, body, extraHeaders)) as IDataObject;
+			uid = res?.result;
+		} else {
+			uid = await xmlRpcCall('common', url, 'authenticate', [db, username, password, {}], extraHeaders);
+		}
 		return Number(uid);
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error as JsonObject);
@@ -236,8 +321,24 @@ export async function odooGetServerVersion(
 	this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions,
 	url: string,
 	extraHeaders?: IDataObject,
+ 	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<IDataObject | IDataObject[]> {
 	try {
+		if (protocol === 'jsonrpc') {
+			const body: IDataObject = {
+				jsonrpc: '2.0',
+				method: 'call',
+				params: {
+					service: 'common',
+					method: 'version',
+					args: [],
+				},
+				id: Math.floor(Math.random() * 1000),
+			};
+			const res = (await jsonRpcRequest.call(this, url, body, extraHeaders)) as IDataObject;
+			return (res?.result as IDataObject) || {};
+		}
+
 		return (await xmlRpcCall('common', url, 'version', [], extraHeaders)) as
 			| IDataObject
 			| IDataObject[];
@@ -257,8 +358,24 @@ async function executeKw(
 	kwargs: IDataObject = {},
 	url?: string,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ) {
 	try {
+		if (protocol === 'jsonrpc') {
+			const body: IDataObject = {
+				jsonrpc: '2.0',
+				method: 'call',
+				params: {
+					service: 'object',
+					method: 'execute_kw',
+					args: [db, userID, password, model, method, args, kwargs],
+				},
+				id: Math.floor(Math.random() * 1000),
+			};
+			const res = (await jsonRpcRequest.call(this, url || '', body, extraHeaders)) as IDataObject;
+			return res?.result;
+		}
+
 		return await xmlRpcCall(
 			'object',
 			url || '',
@@ -292,6 +409,7 @@ export async function odooGetModelFields(
 	resource: string,
 	url: string,
 	extraHeaders?: IDataObject,
+ 	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<IDataObject> {
 	const model = mapOdooResources[resource] || resource;
 	const fields = (await executeKw.call(
@@ -305,6 +423,7 @@ export async function odooGetModelFields(
 		{ attributes: ['string', 'type', 'help', 'required', 'name'] },
 		url,
 		extraHeaders,
+		protocol,
 	)) as IDataObject;
 	return fields as IDataObject;
 }
@@ -319,6 +438,7 @@ export async function odooCreate(
 	url: string,
 	newItem: IDataObject,
 	extraHeaders?: IDataObject,
+ 	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<{ id: IDataObject | IDataObject[] }> {
 	const model = mapOdooResources[resource] || resource;
 	const result = (await executeKw.call(
@@ -332,6 +452,7 @@ export async function odooCreate(
 		{},
 		url,
 		extraHeaders,
+		protocol,
 	)) as IDataObject | IDataObject[];
 	return { id: result };
 }
@@ -347,6 +468,7 @@ export async function odooGet(
 	itemsID: string,
 	fieldsToReturn?: IDataObject[],
 	extraHeaders?: IDataObject,
+ 	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<IDataObject | IDataObject[]> {
 	if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
 		throw new NodeApiError(this.getNode(), {
@@ -367,6 +489,7 @@ export async function odooGet(
 		{ fields: fieldsToReturn || [] },
 		url,
 		extraHeaders,
+		protocol,
 	)) as IDataObject | IDataObject[];
 }
 
@@ -380,6 +503,7 @@ export async function odooCallMethod(
 	callMethod: string,
 	itemsIDs: string,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<IDataObject | IDataObject[]> {
 	const model = mapOdooResources[resource] || resource;
 	const ids = itemsIDs.split(',').map((x) => +x);
@@ -394,6 +518,7 @@ export async function odooCallMethod(
 		{},
 		url,
 		extraHeaders,
+		protocol,
 	)) as IDataObject | IDataObject[];
 }
 
@@ -410,6 +535,7 @@ export async function odooGetAll(
 	limit = 0,
 	offset = 0,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<IDataObject | IDataObject[]> {
 	const model = mapOdooResources[resource] || resource;
 	const domain = processFilters(filters) || [];
@@ -430,6 +556,7 @@ export async function odooGetAll(
 		kwargs,
 		url,
 		extraHeaders,
+		protocol,
 	)) as IDataObject | IDataObject[];
 }
 
@@ -444,6 +571,7 @@ export async function odooUpdate(
 	itemsID: string,
 	fieldsToUpdate: IDataObject,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<{ id: string }> {
 	if (!Object.keys(fieldsToUpdate).length) {
 		throw new NodeApiError(this.getNode(), {
@@ -471,6 +599,7 @@ export async function odooUpdate(
 		{},
 		url,
 		extraHeaders,
+		protocol,
 	);
 	return { id: itemsID };
 }
@@ -485,6 +614,7 @@ export async function odooDelete(
 	url: string,
 	itemsID: string,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<{ success: boolean }> {
 	if (!/^\d+$/.test(itemsID) || !parseInt(itemsID, 10)) {
 		throw new NodeApiError(this.getNode(), {
@@ -505,6 +635,7 @@ export async function odooDelete(
 		{},
 		url,
 		extraHeaders,
+		protocol,
 	);
 	return { success: true };
 }
