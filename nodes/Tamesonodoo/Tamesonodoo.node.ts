@@ -331,7 +331,8 @@ export class Tamesonodoo implements INodeType {
 
 		const resource = this.getNodeParameter('resource', 0) as string;
 		const operation = this.getNodeParameter('operation', 0) as string;
-		const protocol = ((this.getNodeParameter('protocol', 0) as OdooProtocol) || 'xmlrpc') as OdooProtocol;
+		// xml-rpc branch: protocol is always 'xmlrpc'
+		const protocol: OdooProtocol = 'xmlrpc';
 
 		const credentials = (await this.getCredentials('odooApi')) as unknown as OdooCredentials;
 		const url = credentials.url.replace(/\/$/, '');

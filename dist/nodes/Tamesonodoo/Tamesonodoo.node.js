@@ -199,7 +199,8 @@ class Tamesonodoo {
         let responseData;
         const resource = this.getNodeParameter('resource', 0);
         const operation = this.getNodeParameter('operation', 0);
-        const protocol = (this.getNodeParameter('protocol', 0) || 'xmlrpc');
+        // xml-rpc branch: protocol is always 'xmlrpc'
+        const protocol = 'xmlrpc';
         const credentials = (await this.getCredentials('odooApi'));
         const url = credentials.url.replace(/\/$/, '');
         const username = credentials.username;
