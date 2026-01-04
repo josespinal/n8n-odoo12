@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.processNameValueFields = exports.buildAuthenticateProbeBody = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
+exports.odooDelete = exports.odooUpdate = exports.odooGetAll = exports.odooCallMethodWithArgs = exports.odooCallMethod = exports.odooGet = exports.odooCreate = exports.odooGetModelFields = exports.odooGetServerVersion = exports.odooGetUserID = exports.odooAuthenticate = exports.probeXmlRpcEndpoint = exports.processNameValueFields = exports.buildAuthenticateProbeBody = exports.odooGetDBName = exports.mapFilterOperationToXMLRPC = exports.mapOdooResources = exports.mapOperationToXMLRPC = void 0;
 const http = __importStar(require("node:http"));
 const https = __importStar(require("node:https"));
 const xmlrpc = __importStar(require("xmlrpc"));
@@ -202,7 +202,7 @@ async function odooGetServerVersion(url, extraHeaders) {
     }
 }
 exports.odooGetServerVersion = odooGetServerVersion;
-async function executeKw(db, userID, password, model, method, args, kwargs = {}, url, extraHeaders) {
+async function executeKw(db, userID, password, model, method, args, kwargs = {}, url, extraHeaders, protocol = 'xmlrpc') {
     try {
         return await xmlRpcCall('object', url || '', 'execute_kw', [db, userID, password, model, method, args, kwargs], extraHeaders);
     }
@@ -252,6 +252,68 @@ async function odooCallMethod(db, userID, password, resource, url, callMethod, i
     return (await executeKw.call(this, db, userID, password, model, callMethod, [ids], {}, url, extraHeaders));
 }
 exports.odooCallMethod = odooCallMethod;
+async function odooCallMethodWithArgs(db, userID, password, resource, url, methodName, recordIDs, positionalArgs, keywordArgs, extraHeaders, protocol = 'xmlrpc') {
+    const model = exports.mapOdooResources[resource] || resource;
+    // Parse positional arguments
+    let args = [];
+    if (positionalArgs && positionalArgs.trim()) {
+        try {
+            const parsed = JSON.parse(positionalArgs);
+            if (!Array.isArray(parsed)) {
+                throw new n8n_workflow_1.NodeApiError(this.getNode(), {
+                    status: 'Error',
+                    message: 'Positional arguments must be a JSON array',
+                });
+            }
+            args = parsed;
+        }
+        catch (error) {
+            if (error instanceof n8n_workflow_1.NodeApiError) {
+                throw error;
+            }
+            throw new n8n_workflow_1.NodeApiError(this.getNode(), {
+                status: 'Error',
+                message: `Invalid JSON in positional arguments: ${error.message}`,
+            });
+        }
+    }
+    // Parse keyword arguments
+    let kwargs = {};
+    if (keywordArgs && keywordArgs.trim()) {
+        try {
+            const parsed = JSON.parse(keywordArgs);
+            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                throw new n8n_workflow_1.NodeApiError(this.getNode(), {
+                    status: 'Error',
+                    message: 'Keyword arguments must be a JSON object',
+                });
+            }
+            kwargs = parsed;
+        }
+        catch (error) {
+            if (error instanceof n8n_workflow_1.NodeApiError) {
+                throw error;
+            }
+            throw new n8n_workflow_1.NodeApiError(this.getNode(), {
+                status: 'Error',
+                message: `Invalid JSON in keyword arguments: ${error.message}`,
+            });
+        }
+    }
+    // Prepend record IDs to positional arguments if provided
+    if (recordIDs && recordIDs.trim()) {
+        const ids = recordIDs
+            .split(',')
+            .map((x) => x.trim())
+            .filter((x) => x)
+            .map((x) => +x);
+        if (ids.length > 0) {
+            args = [ids, ...args];
+        }
+    }
+    return (await executeKw.call(this, db, userID, password, model, methodName, args, kwargs, url, extraHeaders, protocol));
+}
+exports.odooCallMethodWithArgs = odooCallMethodWithArgs;
 async function odooGetAll(db, userID, password, resource, operation, url, filters, fieldsToReturn, limit = 0, offset = 0, extraHeaders) {
     const model = exports.mapOdooResources[resource] || resource;
     const domain = processFilters(filters) || [];

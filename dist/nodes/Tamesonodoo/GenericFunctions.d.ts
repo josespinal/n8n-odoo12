@@ -1,4 +1,5 @@
 import type { IDataObject, IExecuteFunctions, IExecuteSingleFunctions, IHookFunctions, ILoadOptionsFunctions } from 'n8n-workflow';
+export type OdooProtocol = 'xmlrpc' | 'jsonrpc';
 export declare const mapOperationToXMLRPC: {
     create: string;
     get: string;
@@ -52,6 +53,7 @@ export declare function odooCreate(this: IHookFunctions | IExecuteFunctions | IE
 }>;
 export declare function odooGet(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, fieldsToReturn?: IDataObject[], extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
 export declare function odooCallMethod(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string, callMethod: string, itemsIDs: string, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
+export declare function odooCallMethodWithArgs(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, url: string, methodName: string, recordIDs?: string, positionalArgs?: string, keywordArgs?: string, extraHeaders?: IDataObject, protocol?: OdooProtocol): Promise<IDataObject | IDataObject[]>;
 export declare function odooGetAll(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, filters?: IDataObject, fieldsToReturn?: IDataObject[], limit?: number, offset?: number, extraHeaders?: IDataObject): Promise<IDataObject | IDataObject[]>;
 export declare function odooUpdate(this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions, db: string, userID: number, password: string, resource: string, operation: OdooCRUD, url: string, itemsID: string, fieldsToUpdate: IDataObject, extraHeaders?: IDataObject): Promise<{
     id: string;

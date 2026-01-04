@@ -199,6 +199,7 @@ class Tamesonodoo {
         let responseData;
         const resource = this.getNodeParameter('resource', 0);
         const operation = this.getNodeParameter('operation', 0);
+        const protocol = (this.getNodeParameter('protocol', 0) || 'xmlrpc');
         const credentials = (await this.getCredentials('odooApi'));
         const url = credentials.url.replace(/\/$/, '');
         const username = credentials.username;
@@ -300,6 +301,13 @@ class Tamesonodoo {
                         const methodName = this.getNodeParameter('methodName', i);
                         const itemsIDs = this.getNodeParameter('itemsIDs', i);
                         responseData = await GenericFunctions_1.odooCallMethod.call(this, db, userID, password, customResource, url, methodName, itemsIDs, customHeaders);
+                    }
+                    if (operation === 'callMethodWithArgs') {
+                        const methodName = this.getNodeParameter('methodName', i);
+                        const itemsIDs = this.getNodeParameter('itemsIDs', i);
+                        const positionalArgs = this.getNodeParameter('positionalArgs', i);
+                        const keywordArgs = this.getNodeParameter('keywordArgs', i);
+                        responseData = await GenericFunctions_1.odooCallMethodWithArgs.call(this, db, userID, password, customResource, url, methodName, itemsIDs, positionalArgs, keywordArgs, customHeaders, protocol);
                     }
                     if (operation === 'update') {
                         const customResourceId = this.getNodeParameter('customResourceId', i);

@@ -12,6 +12,8 @@ import type {
 } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
 
+export type OdooProtocol = 'xmlrpc' | 'jsonrpc';
+
 export const mapOperationToXMLRPC = {
 	create: 'create',
 	get: 'read',
@@ -257,6 +259,7 @@ async function executeKw(
 	kwargs: IDataObject = {},
 	url?: string,
 	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
 ) {
 	try {
 		return await xmlRpcCall(

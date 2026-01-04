@@ -38,6 +38,7 @@ import {
 	probeXmlRpcEndpoint,
 	buildAuthenticateProbeBody,
 	processNameValueFields,
+	type OdooProtocol,
 } from './GenericFunctions';
 
 type OdooCredentials = {
@@ -330,6 +331,7 @@ export class Tamesonodoo implements INodeType {
 
 		const resource = this.getNodeParameter('resource', 0) as string;
 		const operation = this.getNodeParameter('operation', 0) as string;
+		const protocol = ((this.getNodeParameter('protocol', 0) as OdooProtocol) || 'xmlrpc') as OdooProtocol;
 
 		const credentials = (await this.getCredentials('odooApi')) as unknown as OdooCredentials;
 		const url = credentials.url.replace(/\/$/, '');
