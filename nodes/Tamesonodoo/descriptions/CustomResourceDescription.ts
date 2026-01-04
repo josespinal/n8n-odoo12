@@ -36,6 +36,12 @@ export const customResourceOperations: INodeProperties[] = [
 				action: 'Call a method on object',
 			},
 			{
+				name: 'Call Method With Arguments',
+				value: 'callMethodWithArgs',
+				description: 'Call a method on object with custom arguments',
+				action: 'Call a method with custom arguments',
+			},
+			{
 				name: 'Create',
 				value: 'create',
 				description: 'Create a new item',
@@ -135,6 +141,59 @@ export const customResourceDescription: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				operation: ['callMethod'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Method Name',
+		name: 'methodName',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Call this method on the object or record',
+		displayOptions: {
+			show: {
+				operation: ['callMethodWithArgs'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Record IDs',
+		name: 'itemsIDs',
+		type: 'string',
+		default: '',
+		description: 'Comma-separated record IDs (optional). If provided, will be prepended to positional arguments',
+		displayOptions: {
+			show: {
+				operation: ['callMethodWithArgs'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Positional Arguments',
+		name: 'positionalArgs',
+		type: 'string',
+		default: '',
+		description: 'JSON array string for positional arguments (e.g., [123, "value"])',
+		displayOptions: {
+			show: {
+				operation: ['callMethodWithArgs'],
+				resource: ['custom'],
+			},
+		},
+	},
+	{
+		displayName: 'Keyword Arguments',
+		name: 'keywordArgs',
+		type: 'string',
+		default: '',
+		description: 'JSON object string for keyword arguments (e.g., {"key": "value"})',
+		displayOptions: {
+			show: {
+				operation: ['callMethodWithArgs'],
 				resource: ['custom'],
 			},
 		},

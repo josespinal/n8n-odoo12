@@ -25,6 +25,7 @@ import {
 } from './descriptions';
 import {
 	odooCallMethod,
+	odooCallMethodWithArgs,
 	odooCreate,
 	odooDelete,
 	odooGet,
@@ -585,6 +586,28 @@ export class Tamesonodoo implements INodeType {
 							methodName,
 							itemsIDs,
 							customHeaders,
+						);
+					}
+
+					if (operation === 'callMethodWithArgs') {
+						const methodName = this.getNodeParameter('methodName', i) as string;
+						const itemsIDs = this.getNodeParameter('itemsIDs', i) as string | undefined;
+						const positionalArgs = this.getNodeParameter('positionalArgs', i) as string | undefined;
+						const keywordArgs = this.getNodeParameter('keywordArgs', i) as string | undefined;
+
+						responseData = await odooCallMethodWithArgs.call(
+							this,
+							db,
+							userID,
+							password,
+							customResource,
+							url,
+							methodName,
+							itemsIDs,
+							positionalArgs,
+							keywordArgs,
+							customHeaders,
+							protocol,
 						);
 					}
 

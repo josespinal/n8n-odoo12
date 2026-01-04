@@ -397,6 +397,95 @@ export async function odooCallMethod(
 	)) as IDataObject | IDataObject[];
 }
 
+export async function odooCallMethodWithArgs(
+	this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions,
+	db: string,
+	userID: number,
+	password: string,
+	resource: string,
+	url: string,
+	methodName: string,
+	recordIDs?: string,
+	positionalArgs?: string,
+	keywordArgs?: string,
+	extraHeaders?: IDataObject,
+	protocol: OdooProtocol = 'xmlrpc',
+): Promise<IDataObject | IDataObject[]> {
+	const model = mapOdooResources[resource] || resource;
+
+	// Parse positional arguments
+	let args: unknown[] = [];
+	if (positionalArgs && positionalArgs.trim()) {
+		try {
+			const parsed = JSON.parse(positionalArgs);
+			if (!Array.isArray(parsed)) {
+				throw new NodeApiError(this.getNode(), {
+					status: 'Error',
+					message: 'Positional arguments must be a JSON array',
+				});
+			}
+			args = parsed;
+		} catch (error) {
+			if (error instanceof NodeApiError) {
+				throw error;
+			}
+			throw new NodeApiError(this.getNode(), {
+				status: 'Error',
+				message: `Invalid JSON in positional arguments: ${(error as Error).message}`,
+			});
+		}
+	}
+
+	// Parse keyword arguments
+	let kwargs: IDataObject = {};
+	if (keywordArgs && keywordArgs.trim()) {
+		try {
+			const parsed = JSON.parse(keywordArgs);
+			if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+				throw new NodeApiError(this.getNode(), {
+					status: 'Error',
+					message: 'Keyword arguments must be a JSON object',
+				});
+			}
+			kwargs = parsed as IDataObject;
+		} catch (error) {
+			if (error instanceof NodeApiError) {
+				throw error;
+			}
+			throw new NodeApiError(this.getNode(), {
+				status: 'Error',
+				message: `Invalid JSON in keyword arguments: ${(error as Error).message}`,
+			});
+		}
+	}
+
+	// Prepend record IDs to positional arguments if provided
+	if (recordIDs && recordIDs.trim()) {
+		const ids = recordIDs
+			.split(',')
+			.map((x) => x.trim())
+			.filter((x) => x)
+			.map((x) => +x);
+		if (ids.length > 0) {
+			args = [ids, ...args];
+		}
+	}
+
+	return (await executeKw.call(
+		this,
+		db,
+		userID,
+		password,
+		model,
+		methodName,
+		args,
+		kwargs,
+		url,
+		extraHeaders,
+		protocol,
+	)) as IDataObject | IDataObject[];
+}
+
 export async function odooGetAll(
 	this: IHookFunctions | IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions,
 	db: string,
