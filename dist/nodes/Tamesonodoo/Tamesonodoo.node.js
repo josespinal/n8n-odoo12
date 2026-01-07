@@ -306,8 +306,11 @@ class Tamesonodoo {
                     if (operation === 'callMethodWithArgs') {
                         const methodName = this.getNodeParameter('methodName', i);
                         const itemsIDs = this.getNodeParameter('itemsIDs', i);
-                        const positionalArgs = this.getNodeParameter('positionalArgs', i);
-                        const keywordArgs = this.getNodeParameter('keywordArgs', i);
+                        const positionalArgsParam = this.getNodeParameter('positionalArgs', i);
+                        const keywordArgsParam = this.getNodeParameter('keywordArgs', i);
+                        // Pass through directly - function handles both string and array/object types
+                        const positionalArgs = positionalArgsParam;
+                        const keywordArgs = keywordArgsParam;
                         responseData = await GenericFunctions_1.odooCallMethodWithArgs.call(this, db, userID, password, customResource, url, methodName, itemsIDs, positionalArgs, keywordArgs, customHeaders, protocol);
                     }
                     if (operation === 'update') {

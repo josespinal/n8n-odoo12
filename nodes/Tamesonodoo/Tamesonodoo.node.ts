@@ -595,8 +595,12 @@ export class Tamesonodoo implements INodeType {
 					if (operation === 'callMethodWithArgs') {
 						const methodName = this.getNodeParameter('methodName', i) as string;
 						const itemsIDs = this.getNodeParameter('itemsIDs', i) as string | undefined;
-						const positionalArgs = this.getNodeParameter('positionalArgs', i) as string | undefined;
-						const keywordArgs = this.getNodeParameter('keywordArgs', i) as string | undefined;
+						const positionalArgsParam = this.getNodeParameter('positionalArgs', i);
+						const keywordArgsParam = this.getNodeParameter('keywordArgs', i);
+						
+						// Pass through directly - function handles both string and array/object types
+						const positionalArgs = positionalArgsParam as string | unknown[] | undefined;
+						const keywordArgs = keywordArgsParam as string | IDataObject | undefined;
 
 						responseData = await odooCallMethodWithArgs.call(
 							this,

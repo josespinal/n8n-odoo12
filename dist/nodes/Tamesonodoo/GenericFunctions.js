@@ -256,16 +256,36 @@ async function odooCallMethodWithArgs(db, userID, password, resource, url, metho
     const model = exports.mapOdooResources[resource] || resource;
     // Parse positional arguments
     let args = [];
-    if (positionalArgs && positionalArgs.trim()) {
+    if (positionalArgs !== undefined && positionalArgs !== null) {
         try {
-            const parsed = JSON.parse(positionalArgs);
-            if (!Array.isArray(parsed)) {
-                throw new n8n_workflow_1.NodeApiError(this.getNode(), {
-                    status: 'Error',
-                    message: 'Positional arguments must be a JSON array',
-                });
+            let parsed;
+            // If it's already an array, use it directly
+            if (Array.isArray(positionalArgs)) {
+                parsed = positionalArgs;
             }
-            args = parsed;
+            else if (typeof positionalArgs === 'string') {
+                // If it's a string, try to parse it
+                const trimmed = positionalArgs.trim();
+                if (trimmed) {
+                    parsed = JSON.parse(trimmed);
+                }
+                else {
+                    parsed = null;
+                }
+            }
+            else {
+                // For other types, try to convert to array
+                parsed = positionalArgs;
+            }
+            if (parsed !== null && parsed !== undefined) {
+                if (!Array.isArray(parsed)) {
+                    throw new n8n_workflow_1.NodeApiError(this.getNode(), {
+                        status: 'Error',
+                        message: 'Positional arguments must be a JSON array',
+                    });
+                }
+                args = parsed;
+            }
         }
         catch (error) {
             if (error instanceof n8n_workflow_1.NodeApiError) {
@@ -279,16 +299,35 @@ async function odooCallMethodWithArgs(db, userID, password, resource, url, metho
     }
     // Parse keyword arguments
     let kwargs = {};
-    if (keywordArgs && keywordArgs.trim()) {
+    if (keywordArgs !== undefined && keywordArgs !== null) {
         try {
-            const parsed = JSON.parse(keywordArgs);
-            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-                throw new n8n_workflow_1.NodeApiError(this.getNode(), {
-                    status: 'Error',
-                    message: 'Keyword arguments must be a JSON object',
-                });
+            let parsed;
+            // If it's already an object, use it directly
+            if (typeof keywordArgs === 'object' && !Array.isArray(keywordArgs) && keywordArgs !== null) {
+                parsed = keywordArgs;
             }
-            kwargs = parsed;
+            else if (typeof keywordArgs === 'string') {
+                // If it's a string, try to parse it
+                const trimmed = keywordArgs.trim();
+                if (trimmed) {
+                    parsed = JSON.parse(trimmed);
+                }
+                else {
+                    parsed = null;
+                }
+            }
+            else {
+                parsed = null;
+            }
+            if (parsed !== null && parsed !== undefined) {
+                if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                    throw new n8n_workflow_1.NodeApiError(this.getNode(), {
+                        status: 'Error',
+                        message: 'Keyword arguments must be a JSON object',
+                    });
+                }
+                kwargs = parsed;
+            }
         }
         catch (error) {
             if (error instanceof n8n_workflow_1.NodeApiError) {

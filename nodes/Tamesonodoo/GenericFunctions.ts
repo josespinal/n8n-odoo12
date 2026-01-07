@@ -409,8 +409,8 @@ export async function odooCallMethodWithArgs(
 	url: string,
 	methodName: string,
 	recordIDs?: string,
-	positionalArgs?: string,
-	keywordArgs?: string,
+	positionalArgs?: string | unknown[],
+	keywordArgs?: string | IDataObject,
 	extraHeaders?: IDataObject,
 	protocol: OdooProtocol = 'xmlrpc',
 ): Promise<IDataObject | IDataObject[]> {
@@ -418,16 +418,34 @@ export async function odooCallMethodWithArgs(
 
 	// Parse positional arguments
 	let args: unknown[] = [];
-	if (positionalArgs && positionalArgs.trim()) {
+	if (positionalArgs !== undefined && positionalArgs !== null) {
 		try {
-			const parsed = JSON.parse(positionalArgs);
-			if (!Array.isArray(parsed)) {
-				throw new NodeApiError(this.getNode(), {
-					status: 'Error',
-					message: 'Positional arguments must be a JSON array',
-				});
+			let parsed: unknown;
+			// If it's already an array, use it directly
+			if (Array.isArray(positionalArgs)) {
+				parsed = positionalArgs;
+			} else if (typeof positionalArgs === 'string') {
+				// If it's a string, try to parse it
+				const trimmed = positionalArgs.trim();
+				if (trimmed) {
+					parsed = JSON.parse(trimmed);
+				} else {
+					parsed = null;
+				}
+			} else {
+				// For other types, try to convert to array
+				parsed = positionalArgs;
 			}
-			args = parsed;
+
+			if (parsed !== null && parsed !== undefined) {
+				if (!Array.isArray(parsed)) {
+					throw new NodeApiError(this.getNode(), {
+						status: 'Error',
+						message: 'Positional arguments must be a JSON array',
+					});
+				}
+				args = parsed;
+			}
 		} catch (error) {
 			if (error instanceof NodeApiError) {
 				throw error;
@@ -441,16 +459,33 @@ export async function odooCallMethodWithArgs(
 
 	// Parse keyword arguments
 	let kwargs: IDataObject = {};
-	if (keywordArgs && keywordArgs.trim()) {
+	if (keywordArgs !== undefined && keywordArgs !== null) {
 		try {
-			const parsed = JSON.parse(keywordArgs);
-			if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-				throw new NodeApiError(this.getNode(), {
-					status: 'Error',
-					message: 'Keyword arguments must be a JSON object',
-				});
+			let parsed: unknown;
+			// If it's already an object, use it directly
+			if (typeof keywordArgs === 'object' && !Array.isArray(keywordArgs) && keywordArgs !== null) {
+				parsed = keywordArgs;
+			} else if (typeof keywordArgs === 'string') {
+				// If it's a string, try to parse it
+				const trimmed = keywordArgs.trim();
+				if (trimmed) {
+					parsed = JSON.parse(trimmed);
+				} else {
+					parsed = null;
+				}
+			} else {
+				parsed = null;
 			}
-			kwargs = parsed as IDataObject;
+
+			if (parsed !== null && parsed !== undefined) {
+				if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+					throw new NodeApiError(this.getNode(), {
+						status: 'Error',
+						message: 'Keyword arguments must be a JSON object',
+					});
+				}
+				kwargs = parsed as IDataObject;
+			}
 		} catch (error) {
 			if (error instanceof NodeApiError) {
 				throw error;
