@@ -2,6 +2,7 @@ import type {
 	ICredentialsDecrypted,
 	ICredentialTestFunctions,
 	IExecuteFunctions,
+	IHookFunctions,
 	ILoadOptionsFunctions,
 	INodeCredentialTestResult,
 	INodeExecutionData,
@@ -24,16 +25,20 @@ import {
 } from './descriptions';
 import {
 	odooCallMethod,
+	odooCallMethodWithArgs,
 	odooCreate,
 	odooDelete,
 	odooGet,
 	odooGetAll,
+	odooAuthenticate,
 	odooGetDBName,
 	odooGetModelFields,
 	odooGetUserID,
-	odooJSONRPCRequest,
 	odooUpdate,
+	probeXmlRpcEndpoint,
+	buildAuthenticateProbeBody,
 	processNameValueFields,
+	type OdooProtocol,
 } from './GenericFunctions';
 
 type OdooCredentials = {
@@ -169,29 +174,18 @@ export class Tamesonodoo implements INodeType {
 				const db = odooGetDBName(credentials.db, url);
 				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
-				const body = {
-					jsonrpc: '2.0',
-					method: 'call',
-					params: {
-						service: 'object',
-						method: 'execute',
-						args: [
-							db,
-							userID,
-							password,
-							'ir.model',
-							'search_read',
-							[],
-							['name', 'model', 'modules'],
-						],
-					},
-					id: Math.floor(Math.random() * 100),
-				};
-
-				const responce = (await odooJSONRPCRequest.call(
+				const responce = (await odooGetAll.call(
 					this,
-					body,
+					db,
+					userID,
+					password,
+					'ir.model',
+					'getAll',
 					url,
+					undefined,
+					['name', 'model', 'modules'] as unknown as IDataObject[],
+					0,
+					0,
 					customHeaders,
 				)) as IDataObject[];
 				const options = responce.map((model) => {
@@ -213,21 +207,18 @@ export class Tamesonodoo implements INodeType {
 				const db = odooGetDBName(credentials.db, url);
 				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
-				const body = {
-					jsonrpc: '2.0',
-					method: 'call',
-					params: {
-						service: 'object',
-						method: 'execute',
-						args: [db, userID, password, 'res.country.state', 'search_read', [], ['id', 'name']],
-					},
-					id: Math.floor(Math.random() * 100),
-				};
-
-				const responce = (await odooJSONRPCRequest.call(
+				const responce = (await odooGetAll.call(
 					this,
-					body,
+					db,
+					userID,
+					password,
+					'res.country.state',
+					'getAll',
 					url,
+					undefined,
+					['id', 'name'] as unknown as IDataObject[],
+					0,
+					0,
 					customHeaders,
 				)) as IDataObject[];
 				const options = responce.map((state) => {
@@ -250,21 +241,18 @@ export class Tamesonodoo implements INodeType {
 				const db = odooGetDBName(credentials.db, url);
 				const userID = await odooGetUserID.call(this, db, username, password, url, customHeaders);
 
-				const body = {
-					jsonrpc: '2.0',
-					method: 'call',
-					params: {
-						service: 'object',
-						method: 'execute',
-						args: [db, userID, password, 'res.country', 'search_read', [], ['id', 'name']],
-					},
-					id: Math.floor(Math.random() * 100),
-				};
-
-				const responce = (await odooJSONRPCRequest.call(
+				const responce = (await odooGetAll.call(
 					this,
-					body,
+					db,
+					userID,
+					password,
+					'res.country',
+					'getAll',
 					url,
+					undefined,
+					['id', 'name'] as unknown as IDataObject[],
+					0,
+					0,
 					customHeaders,
 				)) as IDataObject[];
 				const options = responce.map((country) => {
@@ -288,47 +276,41 @@ export class Tamesonodoo implements INodeType {
 				const customHeaders = getCustomHeaders(credentials);
 
 				try {
-					const body = {
-						jsonrpc: '2.0',
-						method: 'call',
-						params: {
-							service: 'common',
-							method: 'login',
-							args: [
-								odooGetDBName(credentials?.db, credentials?.url),
-								credentials?.username,
-								credentials?.password,
-							],
-						},
-						id: Math.floor(Math.random() * 100),
-					};
+					const db = odooGetDBName(credentials?.db, credentials?.url);
+					const userId = await odooAuthenticate(
+						db,
+						credentials?.username,
+						credentials?.password,
+						credentials?.url,
+						customHeaders,
+					);
 
-					const options = {
-						headers: {
-							'User-Agent': 'n8n',
-							Connection: 'keep-alive',
-							Accept: '*/*',
-							'Content-Type': 'application/json',
-							...customHeaders,
-						},
-						method: 'POST',
-						body,
-						uri: `${credentials?.url.replace(/\/$/, '')}/jsonrpc`,
-						json: true,
-					};
-
-					const result = await this.helpers.request(options);
-
-					if (result.error || !result.result) {
+					if (!userId) {
 						return {
 							status: 'Error',
 							message: 'Credentials are not valid',
 						};
 					}
 				} catch (error) {
+					// Emit detailed information to n8n logs to aid troubleshooting
+					const endpoint = `${credentials?.url.replace(/\/$/, '')}/xmlrpc/2/common`;
+					const versionProbe = await probeXmlRpcEndpoint(endpoint, customHeaders);
+					const authProbeBody = buildAuthenticateProbeBody(
+						odooGetDBName(credentials?.db, credentials?.url),
+						credentials?.username || '',
+						credentials?.password || '',
+					);
+					const authProbe = await probeXmlRpcEndpoint(endpoint, customHeaders, authProbeBody);
+					console.error('Odoo credential test failed', {
+						message: (error as Error).message,
+						stack: (error as Error).stack,
+						versionProbe,
+						authProbe,
+					});
+
 					return {
 						status: 'Error',
-						message: `Settings are not valid: ${error}`,
+						message: `Settings are not valid: ${(error as Error).message || error}`,
 					};
 				}
 
@@ -349,6 +331,8 @@ export class Tamesonodoo implements INodeType {
 
 		const resource = this.getNodeParameter('resource', 0) as string;
 		const operation = this.getNodeParameter('operation', 0) as string;
+		// xml-rpc branch: protocol is always 'xmlrpc'
+		const protocol: OdooProtocol = 'xmlrpc';
 
 		const credentials = (await this.getCredentials('odooApi')) as unknown as OdooCredentials;
 		const url = credentials.url.replace(/\/$/, '');
@@ -605,6 +589,32 @@ export class Tamesonodoo implements INodeType {
 							methodName,
 							itemsIDs,
 							customHeaders,
+						);
+					}
+
+					if (operation === 'callMethodWithArgs') {
+						const methodName = this.getNodeParameter('methodName', i) as string;
+						const itemsIDs = this.getNodeParameter('itemsIDs', i) as string | undefined;
+						const positionalArgsParam = this.getNodeParameter('positionalArgs', i);
+						const keywordArgsParam = this.getNodeParameter('keywordArgs', i);
+						
+						// Pass through directly - function handles both string and array/object types
+						const positionalArgs = positionalArgsParam as string | unknown[] | undefined;
+						const keywordArgs = keywordArgsParam as string | IDataObject | undefined;
+
+						responseData = await odooCallMethodWithArgs.call(
+							this,
+							db,
+							userID,
+							password,
+							customResource,
+							url,
+							methodName,
+							itemsIDs,
+							positionalArgs,
+							keywordArgs,
+							customHeaders,
+							protocol,
 						);
 					}
 
